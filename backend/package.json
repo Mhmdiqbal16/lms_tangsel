@@ -1,0 +1,31 @@
+{
+  "name": "web-smkn2-next-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ./node_modules/next/dist/bin/next dev --port 3001",
+    "build": "node ./node_modules/next/dist/bin/next build",
+    "start": "node ./node_modules/next/dist/bin/next start --port 3001",
+    "lint": "next lint",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "typescript": "latest"
+  },
+  "optionalDependencies": {
+    "@next/swc-linux-x64-gnu": "^16.2.4"
+  }
+}

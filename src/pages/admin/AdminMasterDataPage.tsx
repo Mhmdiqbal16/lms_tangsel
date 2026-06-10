@@ -1,0 +1,1075 @@
+import { FormEvent, useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { InfoAlert } from '@/components/ui/InfoAlert';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DataTable, TableColumn } from '@/components/tables/DataTable';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/apiClient';
+import { ClassRoom, Role, Schedule, StudentProfile, Subject, TeacherProfile, User } from '@/types';
+import { formatDayName } from '@/utils/date';
+import { getRoleLabel } from '@/utils/helpers';
+
+type AdminTab = 'accounts' | 'teachers' | 'classes' | 'subjects' | 'schedules';
+type MasterDataKind = 'teacher' | 'class' | 'subject' | 'schedule';
+type AccountRecord = Omit<User, 'password'>;
+type AccountRoleFilter = Role | 'all';
+
+const roleOptions: Role[] = ['siswa', 'guru', 'kurikulum', 'admin'];
+
+const emptyAccountForm = {
+  role: 'siswa' as Role,
+  studentId: '',
+  identifier: '',
+  password: '',
+  name: '',
+  email: '',
+  classId: '',
+  employeeId: '',
+  subjectIds: [] as string[],
+};
+
+const emptyTeacherForm = {
+  id: '',
+  name: '',
+  nip: '',
+  email: '',
+  subjectIds: [] as string[],
+};
+
+const emptyClassForm = {
+  id: '',
+  name: '',
+  major: '',
+  homeroomTeacherId: '',
+};
+
+const emptySubjectForm = {
+  id: '',
+  name: '',
+  shortName: '',
+};
+
+const emptyScheduleForm = {
+  id: '',
+  classId: '',
+  subjectId: '',
+  teacherId: '',
+  day: 1,
+  startTime: '07:00',
+  endTime: '08:40',
+  room: '',
+};
+
+const dayOptions = [1, 2, 3, 4, 5];
+
+function upsertRecord<T extends { id: string }>(items: T[], nextItem: T) {
+  return items.some((item) => item.id === nextItem.id)
+    ? items.map((item) => (item.id === nextItem.id ? nextItem : item))
+    : [nextItem, ...items];
+}
+
+export function AdminMasterDataPage() {
+  const { session } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTab>('accounts');
+  const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  const [teacherForm, setTeacherForm] = useState(emptyTeacherForm);
+  const [classForm, setClassForm] = useState(emptyClassForm);
+  const [subjectForm, setSubjectForm] = useState(emptySubjectForm);
+  const [scheduleForm, setScheduleForm] = useState(emptyScheduleForm);
+  const [accountForm, setAccountForm] = useState(emptyAccountForm);
+  const [accountSearch, setAccountSearch] = useState('');
+  const [accountRoleFilter, setAccountRoleFilter] = useState<AccountRoleFilter>('all');
+  const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [databaseStudents, setDatabaseStudents] = useState<StudentProfile[]>([]);
+  const [databaseTeachers, setDatabaseTeachers] = useState<TeacherProfile[]>([]);
+  const [databaseClasses, setDatabaseClasses] = useState<ClassRoom[]>([]);
+  const [databaseSubjects, setDatabaseSubjects] = useState<Subject[]>([]);
+  const [databaseSchedules, setDatabaseSchedules] = useState<Schedule[]>([]);
+  const [isAccountsLoading, setIsAccountsLoading] = useState(false);
+  const [isAccountSubmitting, setIsAccountSubmitting] = useState(false);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+  const [isReferencesLoading, setIsReferencesLoading] = useState(false);
+  const [isTeacherSubmitting, setIsTeacherSubmitting] = useState(false);
+  const [isClassSubmitting, setIsClassSubmitting] = useState(false);
+  const [isSubjectSubmitting, setIsSubjectSubmitting] = useState(false);
+  const [isScheduleSubmitting, setIsScheduleSubmitting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsAccountsLoading(true);
+    setIsReferencesLoading(true);
+
+    Promise.all([
+      apiRequest<AccountRecord[]>('/api/admin/accounts'),
+      apiRequest<StudentProfile[]>('/api/admin/students'),
+      apiRequest<TeacherProfile[]>('/api/admin/teachers'),
+      apiRequest<ClassRoom[]>('/api/admin/classes'),
+      apiRequest<Subject[]>('/api/admin/subjects'),
+      apiRequest<Schedule[]>('/api/admin/schedules'),
+    ])
+      .then(([accountData, studentData, teacherData, classData, subjectData, scheduleData]) => {
+        if (isMounted) {
+          setAccounts(accountData);
+          setDatabaseStudents(studentData);
+          setDatabaseTeachers(teacherData);
+          setDatabaseClasses(classData);
+          setDatabaseSubjects(subjectData);
+          setDatabaseSchedules(scheduleData);
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setMessage({
+            tone: 'warning',
+            text: error instanceof Error ? error.message : 'Data admin gagal dimuat dari database.',
+          });
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsAccountsLoading(false);
+          setIsReferencesLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const tabs: Array<{ id: AdminTab; label: string; count: number }> = [
+    { id: 'accounts', label: 'Akun', count: accounts.length },
+    { id: 'teachers', label: 'Guru', count: databaseTeachers.length },
+    { id: 'classes', label: 'Kelas', count: databaseClasses.length },
+    { id: 'subjects', label: 'Mapel', count: databaseSubjects.length },
+    { id: 'schedules', label: 'Jadwal', count: databaseSchedules.length },
+  ];
+
+  const handleDelete = async (kind: MasterDataKind, id: string) => {
+    try {
+      await apiRequest('/api/admin/master-data', {
+        method: 'DELETE',
+        body: JSON.stringify({ kind, id }),
+      });
+
+      if (kind === 'teacher') {
+        setDatabaseTeachers((current) => current.filter((item) => item.id !== id));
+      } else if (kind === 'class') {
+        setDatabaseClasses((current) => current.filter((item) => item.id !== id));
+      } else if (kind === 'subject') {
+        setDatabaseSubjects((current) => current.filter((item) => item.id !== id));
+      } else {
+        setDatabaseSchedules((current) => current.filter((item) => item.id !== id));
+      }
+
+      setMessage({ tone: 'success', text: 'Data berhasil dihapus dari database.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Data gagal dihapus.',
+      });
+    }
+  };
+
+  const handleTeacherSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsTeacherSubmitting(true);
+
+    try {
+      const teacher = await apiRequest<TeacherProfile>('/api/admin/teachers', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...teacherForm,
+          id: teacherForm.id || undefined,
+        }),
+      });
+
+      setDatabaseTeachers((current) => upsertRecord(current, teacher));
+      setTeacherForm(emptyTeacherForm);
+      setMessage({ tone: 'success', text: 'Guru berhasil disimpan ke database.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Guru gagal disimpan.',
+      });
+    } finally {
+      setIsTeacherSubmitting(false);
+    }
+  };
+
+  const handleClassSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsClassSubmitting(true);
+
+    try {
+      const classRoom = await apiRequest<ClassRoom>('/api/admin/classes', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...classForm,
+          id: classForm.id || undefined,
+          homeroomTeacherId: classForm.homeroomTeacherId || undefined,
+        }),
+      });
+
+      setDatabaseClasses((current) => upsertRecord(current, classRoom));
+      setClassForm(emptyClassForm);
+      setMessage({ tone: 'success', text: 'Kelas berhasil disimpan ke database.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Kelas gagal disimpan.',
+      });
+    } finally {
+      setIsClassSubmitting(false);
+    }
+  };
+
+  const handleSubjectSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubjectSubmitting(true);
+
+    try {
+      const subject = await apiRequest<Subject>('/api/admin/subjects', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...subjectForm,
+          id: subjectForm.id || undefined,
+        }),
+      });
+
+      setDatabaseSubjects((current) => upsertRecord(current, subject));
+      setSubjectForm(emptySubjectForm);
+      setMessage({ tone: 'success', text: 'Mata pelajaran berhasil disimpan ke database.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Mata pelajaran gagal disimpan.',
+      });
+    } finally {
+      setIsSubjectSubmitting(false);
+    }
+  };
+
+  const handleScheduleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsScheduleSubmitting(true);
+
+    try {
+      const schedule = await apiRequest<Schedule>('/api/admin/schedules', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...scheduleForm,
+          id: scheduleForm.id || undefined,
+        }),
+      });
+
+      setDatabaseSchedules((current) => upsertRecord(current, schedule));
+      setScheduleForm(emptyScheduleForm);
+      setMessage({ tone: 'success', text: 'Jadwal berhasil disimpan ke database.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Jadwal gagal disimpan.',
+      });
+    } finally {
+      setIsScheduleSubmitting(false);
+    }
+  };
+
+  const handleAccountSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (accountForm.role === 'siswa' && !accountForm.studentId && databaseClasses.length === 0) {
+      setMessage({ tone: 'warning', text: 'Buat kelas di tab Kelas terlebih dahulu sebelum membuat akun siswa baru.' });
+      return;
+    }
+
+    setIsAccountSubmitting(true);
+
+    try {
+      const account = await apiRequest<AccountRecord>('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify({
+          role: accountForm.role,
+          identifier: accountForm.identifier,
+          password: accountForm.password,
+          name: accountForm.name,
+          email: accountForm.email || undefined,
+          referenceId: accountForm.role === 'siswa' && accountForm.studentId ? accountForm.studentId : undefined,
+          classId: accountForm.role === 'siswa' ? accountForm.classId || undefined : undefined,
+          employeeId: accountForm.role === 'kurikulum' ? accountForm.employeeId : undefined,
+          subjectIds: accountForm.role === 'guru' ? accountForm.subjectIds : undefined,
+        }),
+      });
+
+      setAccounts((current) => [account, ...current]);
+      if (accountForm.role === 'siswa') {
+        setDatabaseStudents(await apiRequest<StudentProfile[]>('/api/admin/students'));
+      } else if (accountForm.role === 'guru') {
+        setDatabaseTeachers(await apiRequest<TeacherProfile[]>('/api/admin/teachers'));
+      }
+      setAccountForm(emptyAccountForm);
+      setMessage({ tone: 'success', text: 'Akun berhasil dibuat dan tersimpan ke database.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Akun gagal dibuat.',
+      });
+    } finally {
+      setIsAccountSubmitting(false);
+    }
+  };
+
+  const handleDeleteAccount = async (account: AccountRecord) => {
+    if (account.id === session?.userId) {
+      setMessage({ tone: 'warning', text: 'Akun admin yang sedang digunakan tidak bisa dihapus.' });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Hapus akun ${account.name}? Akun ini tidak bisa digunakan login lagi, tetapi data profil tetap disimpan.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingAccountId(account.id);
+
+    try {
+      await apiRequest('/api/admin/accounts', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: account.id }),
+      });
+
+      setAccounts((current) => current.filter((item) => item.id !== account.id));
+      if (account.role === 'siswa') {
+        setDatabaseStudents(await apiRequest<StudentProfile[]>('/api/admin/students'));
+      } else if (account.role === 'guru') {
+        setDatabaseTeachers(await apiRequest<TeacherProfile[]>('/api/admin/teachers'));
+      }
+      setMessage({ tone: 'success', text: 'Akun berhasil dihapus. Data profil terkait tetap tersimpan.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Akun gagal dihapus.',
+      });
+    } finally {
+      setDeletingAccountId(null);
+    }
+  };
+
+  const toggleTeacherSubject = (subjectId: string) => {
+    setTeacherForm((current) => ({
+      ...current,
+      subjectIds: current.subjectIds.includes(subjectId)
+        ? current.subjectIds.filter((item) => item !== subjectId)
+        : [...current.subjectIds, subjectId],
+    }));
+  };
+
+  const toggleAccountSubject = (subjectId: string) => {
+    setAccountForm((current) => ({
+      ...current,
+      subjectIds: current.subjectIds.includes(subjectId)
+        ? current.subjectIds.filter((item) => item !== subjectId)
+        : [...current.subjectIds, subjectId],
+    }));
+  };
+
+  const handleAccountStudentSelect = (studentId: string) => {
+    const student = databaseStudents.find((item) => item.id === studentId);
+
+    setAccountForm((current) => ({
+      ...current,
+      studentId,
+      name: student?.name ?? '',
+      identifier: student?.nisn ?? '',
+      email: student?.email ?? '',
+      classId: student?.classId ?? '',
+    }));
+  };
+
+  const studentAccountReferenceIds = new Set(
+    accounts.filter((account) => account.role === 'siswa').map((account) => account.referenceId),
+  );
+  const studentsWithoutAccounts = databaseStudents.filter(
+    (student) => !student.userId && !studentAccountReferenceIds.has(student.id),
+  );
+  const selectedAccountStudent = accountForm.studentId
+    ? databaseStudents.find((student) => student.id === accountForm.studentId)
+    : undefined;
+
+  const normalizedAccountSearch = accountSearch.trim().toLowerCase();
+  const hasAccountFilter = accountRoleFilter !== 'all' || normalizedAccountSearch.length > 0;
+  const filteredAccounts = accounts.filter((account) => {
+    const matchesRole = accountRoleFilter === 'all' || account.role === accountRoleFilter;
+    const searchableText = `${account.name} ${account.identifier} ${account.referenceId} ${getRoleLabel(
+      account.role,
+    )}`.toLowerCase();
+
+    return matchesRole && searchableText.includes(normalizedAccountSearch);
+  });
+
+  const accountColumns: TableColumn<AccountRecord>[] = [
+    { key: 'name', header: 'Nama', render: (item) => item.name },
+    { key: 'role', header: 'Role', render: (item) => <Badge variant="blue">{getRoleLabel(item.role)}</Badge> },
+    { key: 'identifier', header: 'NISN/NIP/Username', render: (item) => item.identifier },
+    { key: 'reference', header: 'Profil', render: (item) => item.referenceId },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      render: (item) =>
+        item.id === session?.userId ? (
+          <Badge variant="yellow">Akun aktif</Badge>
+        ) : (
+          <button
+            type="button"
+            disabled={deletingAccountId === item.id}
+            onClick={() => handleDeleteAccount(item)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+          >
+            {deletingAccountId === item.id ? 'Menghapus...' : 'Hapus'}
+          </button>
+        ),
+    },
+  ];
+
+  const teacherColumns: TableColumn<TeacherProfile>[] = [
+    { key: 'name', header: 'Nama', render: (item) => item.name },
+    { key: 'nip', header: 'NIP', render: (item) => item.nip },
+    {
+      key: 'subjects',
+      header: 'Mapel',
+      render: (item) =>
+        item.subjectIds.map((subjectId) => databaseSubjects.find((subject) => subject.id === subjectId)?.shortName).join(', '),
+    },
+    { key: 'email', header: 'Email', render: (item) => item.email },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      render: (item) => (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTeacherForm(item)}
+            className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete('teacher', item.id)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+          >
+            Hapus
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const classColumns: TableColumn<ClassRoom>[] = [
+    { key: 'name', header: 'Kelas', render: (item) => item.name },
+    { key: 'major', header: 'Jurusan', render: (item) => item.major },
+    {
+      key: 'homeroom',
+      header: 'Wali Kelas',
+      render: (item) => databaseTeachers.find((teacher) => teacher.id === item.homeroomTeacherId)?.name ?? '-',
+    },
+    {
+      key: 'students',
+      header: 'Jumlah Siswa',
+      render: (item) => databaseStudents.filter((student) => student.classId === item.id).length,
+    },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      render: (item) => (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setClassForm(item)}
+            className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete('class', item.id)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+          >
+            Hapus
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const subjectColumns: TableColumn<Subject>[] = [
+    { key: 'name', header: 'Mata Pelajaran', render: (item) => item.name },
+    { key: 'shortName', header: 'Singkatan', render: (item) => item.shortName },
+    {
+      key: 'scheduleCount',
+      header: 'Jumlah Jadwal',
+      render: (item) => databaseSchedules.filter((schedule) => schedule.subjectId === item.id).length,
+    },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      render: (item) => (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSubjectForm(item)}
+            className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete('subject', item.id)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+          >
+            Hapus
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const scheduleColumns: TableColumn<Schedule>[] = [
+    { key: 'day', header: 'Hari', render: (item) => formatDayName(item.day) },
+    { key: 'time', header: 'Jam', render: (item) => `${item.startTime} - ${item.endTime}` },
+    {
+      key: 'class',
+      header: 'Kelas',
+      render: (item) => databaseClasses.find((classItem) => classItem.id === item.classId)?.name ?? '-',
+    },
+    {
+      key: 'subject',
+      header: 'Mapel',
+      render: (item) => databaseSubjects.find((subject) => subject.id === item.subjectId)?.name ?? '-',
+    },
+    {
+      key: 'teacher',
+      header: 'Guru',
+      render: (item) => databaseTeachers.find((teacher) => teacher.id === item.teacherId)?.name ?? '-',
+    },
+    { key: 'room', header: 'Ruang', render: (item) => item.room },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      render: (item) => (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setScheduleForm(item)}
+            className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete('schedule', item.id)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+          >
+            Hapus
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Data Master"
+        description="Admin mengelola akun pengguna, guru, kelas, mata pelajaran, dan jadwal yang menjadi dasar seluruh fitur monitoring."
+      />
+
+      {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
+      {isReferencesLoading ? <InfoAlert tone="info" message="Data kelas dan mapel sedang dimuat dari database." /> : null}
+
+      <div className="flex flex-wrap gap-2 rounded-3xl border border-brand-100 bg-white p-3 shadow-soft">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+              activeTab === tab.id ? 'bg-brand-600 text-white shadow-soft' : 'text-slate-600 hover:bg-brand-50'
+            }`}
+          >
+            <span>{tab.label}</span>
+            <Badge variant={activeTab === tab.id ? 'slate' : 'blue'}>{tab.count}</Badge>
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'accounts' ? (
+        <section className="space-y-6">
+          <form className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft" onSubmit={handleAccountSubmit}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-slate-900">Buat Akun Role</h2>
+              <Badge variant="blue">Supabase</Badge>
+            </div>
+            {accountForm.role === 'siswa' ? (
+              <div className="mt-4">
+                <InfoAlert
+                  tone="info"
+                  message="Saat akun siswa disimpan, data profil siswa ikut dibuat otomatis. Cukup isi nama siswa, NISN, password, email, dan kelas di form ini."
+                />
+              </div>
+            ) : null}
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <select
+                value={accountForm.role}
+                onChange={(event) =>
+                  setAccountForm((current) => ({
+                    ...current,
+                    role: event.target.value as Role,
+                    studentId: '',
+                    name: '',
+                    identifier: '',
+                    email: '',
+                    classId: '',
+                    employeeId: '',
+                    subjectIds: [],
+                  }))
+                }
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {getRoleLabel(role)}
+                  </option>
+                ))}
+              </select>
+              {accountForm.role === 'siswa' && studentsWithoutAccounts.length > 0 ? (
+                <select
+                  value={accountForm.studentId}
+                  onChange={(event) => handleAccountStudentSelect(event.target.value)}
+                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none md:col-span-2"
+                >
+                  <option value="">Buat siswa baru dari form akun</option>
+                  {studentsWithoutAccounts.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name} - {student.nisn}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <input
+                value={accountForm.name}
+                onChange={(event) => setAccountForm((current) => ({ ...current, name: event.target.value }))}
+                disabled={Boolean(selectedAccountStudent)}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                placeholder={accountForm.role === 'siswa' ? 'Nama siswa' : 'Nama akun'}
+              />
+              <input
+                value={accountForm.identifier}
+                onChange={(event) => setAccountForm((current) => ({ ...current, identifier: event.target.value }))}
+                disabled={Boolean(selectedAccountStudent)}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                placeholder={accountForm.role === 'siswa' ? 'NISN' : 'NIP/username'}
+              />
+              <input
+                type="password"
+                value={accountForm.password}
+                onChange={(event) => setAccountForm((current) => ({ ...current, password: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Password minimal 6 karakter"
+              />
+              <input
+                type="email"
+                value={accountForm.email}
+                onChange={(event) => setAccountForm((current) => ({ ...current, email: event.target.value }))}
+                disabled={Boolean(selectedAccountStudent)}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                placeholder={accountForm.role === 'siswa' ? 'Email siswa' : 'Email'}
+              />
+              {accountForm.role === 'siswa' ? (
+                <select
+                  value={accountForm.classId}
+                  onChange={(event) => setAccountForm((current) => ({ ...current, classId: event.target.value }))}
+                  disabled={Boolean(selectedAccountStudent)}
+                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                >
+                  <option value="">Pilih kelas siswa</option>
+                  {databaseClasses.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              {accountForm.role === 'kurikulum' ? (
+                <input
+                  value={accountForm.employeeId}
+                  onChange={(event) => setAccountForm((current) => ({ ...current, employeeId: event.target.value }))}
+                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                  placeholder="ID pegawai"
+                />
+              ) : null}
+            </div>
+            {accountForm.role === 'guru' ? (
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {databaseSubjects.map((subject) => (
+                  <label
+                    key={subject.id}
+                    className="flex items-center gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm font-medium text-slate-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={accountForm.subjectIds.includes(subject.id)}
+                      onChange={() => toggleAccountSubject(subject.id)}
+                      className="h-4 w-4 accent-brand-600"
+                    />
+                    <span>{subject.name}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isAccountSubmitting}
+                className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+              >
+                {isAccountSubmitting
+                  ? 'Menyimpan...'
+                  : accountForm.role === 'siswa'
+                    ? 'Simpan Akun & Data Siswa'
+                    : 'Simpan Akun'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountForm(emptyAccountForm)}
+                className="rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Reset Form
+              </button>
+            </div>
+          </form>
+          {isAccountsLoading ? (
+            <InfoAlert tone="info" message="Daftar akun sedang dimuat dari database." />
+          ) : (
+            <>
+              <FilterBar>
+                <input
+                  value={accountSearch}
+                  onChange={(event) => setAccountSearch(event.target.value)}
+                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                  placeholder="Cari nama, username, atau profil"
+                />
+                <select
+                  value={accountRoleFilter}
+                  onChange={(event) => setAccountRoleFilter(event.target.value as AccountRoleFilter)}
+                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                >
+                  <option value="all">Semua role</option>
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {getRoleLabel(role)}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-slate-600">
+                  <span>
+                    <span className="font-semibold text-slate-900">{filteredAccounts.length}</span> dari {accounts.length}{' '}
+                    akun
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!hasAccountFilter}
+                    onClick={() => {
+                      setAccountSearch('');
+                      setAccountRoleFilter('all');
+                    }}
+                    className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </FilterBar>
+              <DataTable
+                data={filteredAccounts}
+                columns={accountColumns}
+                getRowKey={(item) => item.id}
+                emptyTitle="Akun tidak ditemukan"
+                emptyDescription="Tidak ada akun yang sesuai dengan filter saat ini."
+              />
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {activeTab === 'teachers' ? (
+        <section className="space-y-6">
+          <form className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft" onSubmit={handleTeacherSubmit}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-slate-900">{teacherForm.id ? 'Edit Guru' : 'Tambah Guru'}</h2>
+              {teacherForm.id ? <Badge variant="yellow">Mode edit</Badge> : null}
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <input
+                value={teacherForm.name}
+                onChange={(event) => setTeacherForm((current) => ({ ...current, name: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Nama guru"
+              />
+              <input
+                value={teacherForm.nip}
+                onChange={(event) => setTeacherForm((current) => ({ ...current, nip: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="NIP"
+              />
+              <input
+                type="email"
+                value={teacherForm.email}
+                onChange={(event) => setTeacherForm((current) => ({ ...current, email: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Email"
+              />
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {databaseSubjects.map((subject) => (
+                <label
+                  key={subject.id}
+                  className="flex items-center gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm font-medium text-slate-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={teacherForm.subjectIds.includes(subject.id)}
+                    onChange={() => toggleTeacherSubject(subject.id)}
+                    className="h-4 w-4 accent-brand-600"
+                  />
+                  <span>{subject.name}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isTeacherSubmitting}
+                className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+              >
+                {isTeacherSubmitting ? 'Menyimpan...' : 'Simpan Guru'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTeacherForm(emptyTeacherForm)}
+                className="rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Reset Form
+              </button>
+            </div>
+          </form>
+          <DataTable data={databaseTeachers} columns={teacherColumns} getRowKey={(item) => item.id} />
+        </section>
+      ) : null}
+
+      {activeTab === 'classes' ? (
+        <section className="space-y-6">
+          <form className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft" onSubmit={handleClassSubmit}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-slate-900">{classForm.id ? 'Edit Kelas' : 'Tambah Kelas'}</h2>
+              {classForm.id ? <Badge variant="yellow">Mode edit</Badge> : null}
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <input
+                value={classForm.name}
+                onChange={(event) => setClassForm((current) => ({ ...current, name: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Nama kelas"
+              />
+              <input
+                value={classForm.major}
+                onChange={(event) => setClassForm((current) => ({ ...current, major: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Jurusan"
+              />
+              <select
+                value={classForm.homeroomTeacherId}
+                onChange={(event) => setClassForm((current) => ({ ...current, homeroomTeacherId: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                <option value="">Pilih wali kelas</option>
+                {databaseTeachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isClassSubmitting}
+                className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+              >
+                {isClassSubmitting ? 'Menyimpan...' : 'Simpan Kelas'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setClassForm(emptyClassForm)}
+                className="rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Reset Form
+              </button>
+            </div>
+          </form>
+          <DataTable data={databaseClasses} columns={classColumns} getRowKey={(item) => item.id} />
+        </section>
+      ) : null}
+
+      {activeTab === 'subjects' ? (
+        <section className="space-y-6">
+          <form className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft" onSubmit={handleSubjectSubmit}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-slate-900">{subjectForm.id ? 'Edit Mapel' : 'Tambah Mapel'}</h2>
+              {subjectForm.id ? <Badge variant="yellow">Mode edit</Badge> : null}
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <input
+                value={subjectForm.name}
+                onChange={(event) => setSubjectForm((current) => ({ ...current, name: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Nama mata pelajaran"
+              />
+              <input
+                value={subjectForm.shortName}
+                onChange={(event) => setSubjectForm((current) => ({ ...current, shortName: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Singkatan"
+              />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isSubjectSubmitting}
+                className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+              >
+                {isSubjectSubmitting ? 'Menyimpan...' : 'Simpan Mapel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubjectForm(emptySubjectForm)}
+                className="rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Reset Form
+              </button>
+            </div>
+          </form>
+          <DataTable data={databaseSubjects} columns={subjectColumns} getRowKey={(item) => item.id} />
+        </section>
+      ) : null}
+
+      {activeTab === 'schedules' ? (
+        <section className="space-y-6">
+          <form className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft" onSubmit={handleScheduleSubmit}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-slate-900">
+                {scheduleForm.id ? 'Edit Jadwal' : 'Tambah Jadwal'}
+              </h2>
+              {scheduleForm.id ? <Badge variant="yellow">Mode edit</Badge> : null}
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <select
+                value={scheduleForm.day}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, day: Number(event.target.value) }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                {dayOptions.map((day) => (
+                  <option key={day} value={day}>
+                    {formatDayName(day)}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={scheduleForm.classId}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, classId: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                <option value="">Pilih kelas</option>
+                {databaseClasses.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={scheduleForm.subjectId}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, subjectId: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                <option value="">Pilih mapel</option>
+                {databaseSubjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={scheduleForm.teacherId}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, teacherId: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                <option value="">Pilih guru</option>
+                {databaseTeachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={scheduleForm.startTime}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, startTime: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              />
+              <input
+                type="time"
+                value={scheduleForm.endTime}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, endTime: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              />
+              <input
+                value={scheduleForm.room}
+                onChange={(event) => setScheduleForm((current) => ({ ...current, room: event.target.value }))}
+                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none md:col-span-3"
+                placeholder="Ruang belajar"
+              />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isScheduleSubmitting}
+                className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+              >
+                {isScheduleSubmitting ? 'Menyimpan...' : 'Simpan Jadwal'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleForm(emptyScheduleForm)}
+                className="rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Reset Form
+              </button>
+            </div>
+          </form>
+          <DataTable
+            data={databaseSchedules
+              .slice()
+              .sort((first, second) => first.day - second.day || first.startTime.localeCompare(second.startTime))}
+            columns={scheduleColumns}
+            getRowKey={(item) => item.id}
+          />
+        </section>
+      ) : null}
+    </div>
+  );
+}
