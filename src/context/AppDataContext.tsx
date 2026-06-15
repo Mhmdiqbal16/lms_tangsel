@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { initialAppDataState, mockData } from '@/data/mockData';
-import { apiRequest } from '@/lib/apiClient';
+import { ApiError, apiRequest } from '@/lib/apiClient';
 import {
   AdminProfile,
   AppDataState,
@@ -73,6 +73,16 @@ interface AddLearningMaterialPayload {
   title: string;
   description: string;
 }
+
+type CurriculumValidationResponse =
+  | {
+      source: 'journal';
+      item: StudentJournal;
+    }
+  | {
+      source: 'material';
+      item: LearningMaterial;
+    };
 
 type AssessmentQuestionInput = Pick<AssessmentQuestion, 'question' | 'options' | 'answer'>;
 
@@ -161,20 +171,20 @@ interface AppDataContextValue extends AppDataState {
   studentAttendances: typeof mockData.studentAttendances;
   notifications: typeof mockData.notifications;
   reportSummary: typeof mockData.reportSummary;
-  addStudentJournal: (payload: AddJournalPayload) => ActionResult;
+  addStudentJournal: (payload: AddJournalPayload) => Promise<ActionResult>;
   addTeacherAttendance: (payload: AddTeacherAttendancePayload) => ActionResult;
   saveStudentAttendances: (payload: SaveStudentAttendancesPayload) => ActionResult;
-  addLearningMaterial: (payload: AddLearningMaterialPayload) => ActionResult;
-  addAssessmentBundle: (payload: AddAssessmentBundlePayload) => ActionResult;
-  completeAssessment: (assessmentId: string, studentId: string) => void;
+  addLearningMaterial: (payload: AddLearningMaterialPayload) => Promise<ActionResult>;
+  addAssessmentBundle: (payload: AddAssessmentBundlePayload) => Promise<ActionResult>;
+  completeAssessment: (assessmentId: string, studentId: string) => Promise<ActionResult>;
   completeQuestionnaire: (payload: {
     studentId: string;
     teacherId: string;
     scheduleId: string;
     date: string;
-  }) => void;
-  setJournalValidation: (journalId: string, status: ValidationStatus) => void;
-  setMaterialValidation: (materialId: string, status: ValidationStatus) => void;
+  }) => Promise<ActionResult>;
+  setJournalValidation: (journalId: string, status: ValidationStatus) => Promise<ActionResult>;
+  setMaterialValidation: (materialId: string, status: ValidationStatus) => Promise<ActionResult>;
   updateOwnPassword: (payload: UpdatePasswordPayload) => ActionResult;
   updateStudentAccount: (payload: UpdateStudentAccountPayload) => ActionResult;
   updateTeacherProfile: (payload: UpdateTeacherProfilePayload) => ActionResult;
@@ -233,6 +243,20 @@ function upsertById<T extends { id: string }>(items: T[], nextItem: T) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getApiActionError(error: unknown, fallbackMessage: string): ActionResult {
+  if (error instanceof ApiError) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  return {
+    success: false,
+    message: error instanceof Error ? error.message : fallbackMessage,
+  };
 }
 
 function normalizeAvatar(value: string, name: string) {
@@ -319,7 +343,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       totalJournals: state.studentJournals.length,
       totalTeacherAttendances: state.teacherAttendances.length,
     },
-    addStudentJournal: (payload) => {
+    addStudentJournal: async (payload) => {
       const accessError = getAccessError('student.journal.create', 'Akun aktif tidak memiliki akses mengisi jurnal.');
       if (accessError) {
         return accessError;
@@ -344,24 +368,35 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const nextJournal: StudentJournal = {
-        id: createId('jur'),
-        ...payload,
-        entryStatus: 'Selesai',
-        reviewStatus: 'Menunggu Review',
-        notes: 'Menunggu review guru.',
-        validationStatus: 'Menunggu',
-      };
+      try {
+        const savedJournal = await apiRequest<StudentJournal>('/api/student/journals', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
 
-      setState((current) => ({
-        ...current,
-        studentJournals: [nextJournal, ...current.studentJournals],
-      }));
+        setState((current) => ({
+          ...current,
+          studentJournals: [
+            savedJournal,
+            ...current.studentJournals.filter(
+              (journal) =>
+                journal.id !== savedJournal.id &&
+                !(
+                  journal.studentId === savedJournal.studentId &&
+                  journal.scheduleId === savedJournal.scheduleId &&
+                  journal.date === savedJournal.date
+                ),
+            ),
+          ],
+        }));
 
-      return {
-        success: true,
-        message: 'Jurnal berhasil disimpan.',
-      };
+        return {
+          success: true,
+          message: 'Jurnal berhasil disimpan.',
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Jurnal gagal disimpan.');
+      }
     },
     addTeacherAttendance: (payload) => {
       const accessError = getAccessError(
@@ -518,7 +553,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         message: 'Absensi siswa berhasil disimpan.',
       };
     },
-    addLearningMaterial: (payload) => {
+    addLearningMaterial: async (payload) => {
       const accessError = getAccessError(
         'learning.material.create',
         'Akun aktif tidak memiliki akses menginput materi pembelajaran.',
@@ -552,25 +587,33 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      setState((current) => ({
-        ...current,
-        learningMaterials: [
-          {
-            id: createId('mat'),
-            ...payload,
-            validationStatus: 'Menunggu',
-            alignmentStatus: 'Sesuai',
-          },
-          ...current.learningMaterials,
-        ],
-      }));
+      try {
+        const savedMaterial = await apiRequest<LearningMaterial>('/api/teacher/learning-materials', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
 
-      return {
-        success: true,
-        message: 'Materi pembelajaran berhasil disimpan.',
-      };
+        setState((current) => ({
+          ...current,
+          learningMaterials: [
+            savedMaterial,
+            ...current.learningMaterials.filter(
+              (material) =>
+                material.id !== savedMaterial.id &&
+                !(material.scheduleId === savedMaterial.scheduleId && material.date === savedMaterial.date),
+            ),
+          ],
+        }));
+
+        return {
+          success: true,
+          message: 'Materi pembelajaran berhasil disimpan.',
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Materi pembelajaran gagal disimpan.');
+      }
     },
-    addAssessmentBundle: (payload) => {
+    addAssessmentBundle: async (payload) => {
       const accessError = getAccessError(
         'assessment.manage',
         'Akun aktif tidak memiliki akses membuat pretest dan posttest.',
@@ -618,151 +661,176 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const classStudents = state.students.filter((item) => item.classId === payload.classId);
-      const pretestQuestions = normalizeAssessmentQuestions('Pretest', payload.pretestQuestions);
-      const posttestQuestions = normalizeAssessmentQuestions('Posttest', payload.posttestQuestions);
+      try {
+        const savedAssessments = await apiRequest<AssessmentRecord[]>('/api/teacher/assessments', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        const savedAssessmentIds = new Set(savedAssessments.map((assessment) => assessment.id));
 
-      const buildStudentStatuses = () =>
-        classStudents.map((item) => ({
-          studentId: item.id,
-          completed: false,
-        }));
-
-      const pretest: AssessmentRecord = {
-        id: createId('asm-pre'),
-        type: 'pretest',
-        teacherId: payload.teacherId,
-        scheduleId: payload.scheduleId,
-        classId: payload.classId,
-        subjectId: payload.subjectId,
-        date: payload.date,
-        meeting: payload.meeting,
-        questionCount: pretestQuestions.length,
-        status: payload.status,
-        questions: pretestQuestions,
-        studentStatuses: buildStudentStatuses(),
-      };
-
-      const posttest: AssessmentRecord = {
-        id: createId('asm-post'),
-        type: 'posttest',
-        teacherId: payload.teacherId,
-        scheduleId: payload.scheduleId,
-        classId: payload.classId,
-        subjectId: payload.subjectId,
-        date: payload.date,
-        meeting: payload.meeting,
-        questionCount: posttestQuestions.length,
-        status: payload.status,
-        questions: posttestQuestions,
-        studentStatuses: buildStudentStatuses(),
-      };
-
-      setState((current) => ({
-        ...current,
-        assessments: [pretest, posttest, ...current.assessments],
-      }));
-
-      return {
-        success: true,
-        message: 'Paket pretest dan posttest berhasil dibuat.',
-      };
-    },
-    completeAssessment: (assessmentId, studentId) => {
-      if (!session || session.role !== 'siswa' || session.referenceId !== studentId) {
-        return;
-      }
-
-      setState((current) => ({
-        ...current,
-        assessments: current.assessments.map((assessment) =>
-          assessment.id !== assessmentId
-            ? assessment
-            : {
-                ...assessment,
-                studentStatuses: assessment.studentStatuses.map((status) =>
-                  status.studentId === studentId ? { ...status, completed: true } : status,
-                ),
-              },
-        ),
-      }));
-    },
-    completeQuestionnaire: ({ studentId, teacherId, scheduleId, date }) => {
-      if (!session || session.role !== 'siswa' || session.referenceId !== studentId) {
-        return;
-      }
-
-      const existing = state.questionnaires.find(
-        (item) =>
-          item.studentId === studentId &&
-          item.teacherId === teacherId &&
-          item.scheduleId === scheduleId &&
-          item.date === date,
-      );
-
-      if (existing) {
         setState((current) => ({
           ...current,
-          questionnaires: current.questionnaires.map((item) =>
-            item.id === existing.id ? { ...item, completed: true } : item,
+          assessments: [
+            ...savedAssessments,
+            ...current.assessments.filter((assessment) => !savedAssessmentIds.has(assessment.id)),
+          ],
+        }));
+
+        return {
+          success: true,
+          message: 'Paket pretest dan posttest berhasil dibuat.',
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Paket pretest dan posttest gagal disimpan.');
+      }
+    },
+    completeAssessment: async (assessmentId, studentId) => {
+      if (!session || session.role !== 'siswa' || session.referenceId !== studentId) {
+        return {
+          success: false,
+          message: 'Siswa hanya dapat menyelesaikan assessment untuk akun miliknya sendiri.',
+        };
+      }
+
+      try {
+        const updatedAssessment = await apiRequest<AssessmentRecord>('/api/student/assessments/complete', {
+          method: 'POST',
+          body: JSON.stringify({ assessmentId, studentId }),
+        });
+
+        setState((current) => ({
+          ...current,
+          assessments: current.assessments.map((assessment) =>
+            assessment.id === updatedAssessment.id ? updatedAssessment : assessment,
           ),
         }));
-        return;
+
+        return {
+          success: true,
+          message: 'Assessment berhasil ditandai selesai.',
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Assessment gagal ditandai selesai.');
       }
-
-      const questionnaire: TeacherQuestionnaire = {
-        id: createId('kui'),
-        studentId,
-        teacherId,
-        scheduleId,
-        date,
-        completed: true,
-      };
-
-      setState((current) => ({
-        ...current,
-        questionnaires: [questionnaire, ...current.questionnaires],
-      }));
     },
-    setJournalValidation: (journalId, status) => {
-      if (!session || !hasPermission('validation.manage')) {
-        return;
+    completeQuestionnaire: async ({ studentId, teacherId, scheduleId, date }) => {
+      if (!session || session.role !== 'siswa' || session.referenceId !== studentId) {
+        return {
+          success: false,
+          message: 'Siswa hanya dapat mengisi kuisioner untuk akun miliknya sendiri.',
+        };
       }
 
-      setState((current) => ({
-        ...current,
-        studentJournals: current.studentJournals.map((journal) =>
-          journal.id !== journalId
-            ? journal
-            : {
-                ...journal,
-                validationStatus: status,
-                reviewStatus: status === 'Valid' ? 'Tervalidasi' : 'Perlu Revisi',
-                notes:
-                  status === 'Valid'
-                    ? 'Jurnal tervalidasi oleh kurikulum.'
-                    : 'Jurnal ditolak. Perlu pembaruan isi dan kesesuaian materi.',
-              },
-        ),
-      }));
+      try {
+        const savedQuestionnaire = await apiRequest<TeacherQuestionnaire>('/api/student/questionnaires', {
+          method: 'POST',
+          body: JSON.stringify({ studentId, teacherId, scheduleId, date }),
+        });
+
+        setState((current) => ({
+          ...current,
+          questionnaires: [
+            savedQuestionnaire,
+            ...current.questionnaires.filter(
+              (questionnaire) =>
+                questionnaire.id !== savedQuestionnaire.id &&
+                !(
+                  questionnaire.studentId === savedQuestionnaire.studentId &&
+                  questionnaire.teacherId === savedQuestionnaire.teacherId &&
+                  questionnaire.scheduleId === savedQuestionnaire.scheduleId &&
+                  questionnaire.date === savedQuestionnaire.date
+                ),
+            ),
+          ],
+        }));
+
+        return {
+          success: true,
+          message: 'Kuisioner guru berhasil ditandai selesai.',
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Kuisioner guru gagal ditandai selesai.');
+      }
     },
-    setMaterialValidation: (materialId, status) => {
+    setJournalValidation: async (journalId, status) => {
       if (!session || !hasPermission('validation.manage')) {
-        return;
+        return {
+          success: false,
+          message: 'Akun aktif tidak memiliki akses validasi jurnal siswa.',
+        };
       }
 
-      setState((current) => ({
-        ...current,
-        learningMaterials: current.learningMaterials.map((material) =>
-          material.id !== materialId
-            ? material
-            : {
-                ...material,
-                validationStatus: status,
-                alignmentStatus: status === 'Valid' ? 'Sesuai' : 'Perlu Cek',
-              },
-        ),
-      }));
+      try {
+        const response = await apiRequest<CurriculumValidationResponse>('/api/curriculum/validations', {
+          method: 'POST',
+          body: JSON.stringify({
+            source: 'journal',
+            sourceId: journalId,
+            status,
+          }),
+        });
+
+        if (response.source !== 'journal') {
+          return {
+            success: false,
+            message: 'Response validasi jurnal tidak sesuai.',
+          };
+        }
+
+        setState((current) => ({
+          ...current,
+          studentJournals: current.studentJournals.map((journal) =>
+            journal.id === response.item.id ? response.item : journal,
+          ),
+        }));
+
+        return {
+          success: true,
+          message: `Jurnal siswa berhasil diubah menjadi ${status}.`,
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Validasi jurnal siswa gagal disimpan.');
+      }
+    },
+    setMaterialValidation: async (materialId, status) => {
+      if (!session || !hasPermission('validation.manage')) {
+        return {
+          success: false,
+          message: 'Akun aktif tidak memiliki akses validasi materi guru.',
+        };
+      }
+
+      try {
+        const response = await apiRequest<CurriculumValidationResponse>('/api/curriculum/validations', {
+          method: 'POST',
+          body: JSON.stringify({
+            source: 'material',
+            sourceId: materialId,
+            status,
+          }),
+        });
+
+        if (response.source !== 'material') {
+          return {
+            success: false,
+            message: 'Response validasi materi tidak sesuai.',
+          };
+        }
+
+        setState((current) => ({
+          ...current,
+          learningMaterials: current.learningMaterials.map((material) =>
+            material.id === response.item.id ? response.item : material,
+          ),
+        }));
+
+        return {
+          success: true,
+          message: `Materi guru berhasil diubah menjadi ${status}.`,
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Validasi materi guru gagal disimpan.');
+      }
     },
     updateOwnPassword: (payload) => {
       if (!session) {

@@ -7,10 +7,13 @@ import {
   getDateOrAcademicToday,
   getScheduleView as getMockScheduleView,
   getTodayDate,
+  assessments as mockAssessments,
   learningMaterials as mockLearningMaterials,
   parseISODate,
+  questionnaires as mockQuestionnaires,
   schedules as mockSchedules,
   studentAttendances as mockStudentAttendances,
+  studentJournals as mockStudentJournals,
   students as mockStudents,
   subjects as mockSubjects,
   teacherAttendances as mockTeacherAttendances,
@@ -20,15 +23,19 @@ import {
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type {
   Admin,
+  AssessmentQuestion,
+  AssessmentRecord,
   ClassRoom,
   Curriculum,
   LearningMaterial,
   Schedule,
   Student,
   StudentAttendance,
+  StudentJournal,
   Subject,
   Teacher,
   TeacherAttendance,
+  TeacherQuestionnaire,
   User,
 } from '@/types/domain';
 
@@ -115,6 +122,71 @@ type StudentAttendanceRow = {
   schedule_id: string;
   date: string;
   status: StudentAttendance['status'];
+};
+
+type LearningMaterialRow = {
+  id: string;
+  teacher_id: string;
+  schedule_id: string;
+  date: string;
+  meeting: number;
+  title: string;
+  description: string;
+  validation_status: LearningMaterial['validationStatus'];
+  alignment_status: LearningMaterial['alignmentStatus'];
+};
+
+type AssessmentRow = {
+  id: string;
+  type: AssessmentRecord['type'];
+  teacher_id: string;
+  schedule_id: string;
+  class_id: string;
+  subject_id: string;
+  date: string;
+  meeting: number;
+  question_count: number;
+  status: AssessmentRecord['status'];
+};
+
+type AssessmentQuestionRow = {
+  id: string;
+  assessment_id: string;
+  question: string;
+  options: unknown;
+  answer: string;
+  position: number;
+};
+
+type AssessmentStudentStatusRow = {
+  assessment_id: string;
+  student_id: string;
+  completed: boolean;
+};
+
+type TeacherQuestionnaireRow = {
+  id: string;
+  student_id: string;
+  teacher_id: string;
+  schedule_id: string;
+  date: string;
+  completed: boolean;
+};
+
+type StudentJournalRow = {
+  id: string;
+  student_id: string;
+  schedule_id: string;
+  date: string;
+  material_studied: string;
+  summary: string;
+  tasks: string;
+  learning_obstacles: string;
+  attachment_name: string | null;
+  entry_status: StudentJournal['entryStatus'];
+  review_status: StudentJournal['reviewStatus'];
+  notes: string;
+  validation_status: StudentJournal['validationStatus'];
 };
 
 export class RepositoryError extends Error {
@@ -342,6 +414,79 @@ function toStudentAttendance(row: StudentAttendanceRow): StudentAttendance {
     scheduleId: row.schedule_id,
     date: row.date,
     status: row.status,
+  };
+}
+
+function toLearningMaterial(row: LearningMaterialRow): LearningMaterial {
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    scheduleId: row.schedule_id,
+    date: row.date,
+    meeting: row.meeting,
+    title: row.title,
+    description: row.description,
+    validationStatus: row.validation_status,
+    alignmentStatus: row.alignment_status,
+  };
+}
+
+function toAssessmentQuestion(row: AssessmentQuestionRow): AssessmentQuestion {
+  return {
+    id: row.id,
+    question: row.question,
+    options: Array.isArray(row.options) ? row.options.map(String) : [],
+    answer: row.answer,
+  };
+}
+
+function toAssessment(
+  row: AssessmentRow,
+  questions: AssessmentQuestion[],
+  studentStatuses: AssessmentRecord['studentStatuses'],
+): AssessmentRecord {
+  return {
+    id: row.id,
+    type: row.type,
+    teacherId: row.teacher_id,
+    scheduleId: row.schedule_id,
+    classId: row.class_id,
+    subjectId: row.subject_id,
+    date: row.date,
+    meeting: row.meeting,
+    questionCount: row.question_count,
+    status: row.status,
+    questions,
+    studentStatuses,
+  };
+}
+
+function toTeacherQuestionnaire(row: TeacherQuestionnaireRow): TeacherQuestionnaire {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    teacherId: row.teacher_id,
+    scheduleId: row.schedule_id,
+    date: row.date,
+    completed: row.completed,
+  };
+}
+
+function toStudentJournal(row: StudentJournalRow): StudentJournal {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    scheduleId: row.schedule_id,
+    date: row.date,
+    materialStudied: row.material_studied,
+    summary: row.summary,
+    tasks: row.tasks,
+    learningObstacles: row.learning_obstacles,
+    attachmentName: row.attachment_name ?? '',
+    entryStatus: row.entry_status,
+    reviewStatus: row.review_status,
+    notes: row.notes,
+    validationStatus: row.validation_status,
   };
 }
 
@@ -1521,30 +1666,563 @@ export async function listLearningMaterials() {
 
   const { data, error } = await supabase.from('learning_materials').select('*').order('date', { ascending: false });
   throwSupabaseError('Gagal mengambil materi pembelajaran', error);
-  return (data ?? []).map((row) => {
-    const item = row as {
-      id: string;
-      teacher_id: string;
-      schedule_id: string;
-      date: string;
-      meeting: number;
-      title: string;
-      description: string;
-      validation_status: LearningMaterial['validationStatus'];
-      alignment_status: LearningMaterial['alignmentStatus'];
-    };
-    return {
-      id: item.id,
-      teacherId: item.teacher_id,
-      scheduleId: item.schedule_id,
-      date: item.date,
-      meeting: item.meeting,
-      title: item.title,
-      description: item.description,
-      validationStatus: item.validation_status,
-      alignmentStatus: item.alignment_status,
-    } satisfies LearningMaterial;
+  return (data ?? []).map((row) => toLearningMaterial(row as LearningMaterialRow));
+}
+
+export async function getLearningMaterial(params: { scheduleId: string; date: string }) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return (
+      mockLearningMaterials.find(
+        (material) => material.scheduleId === params.scheduleId && material.date === params.date,
+      ) ?? null
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('learning_materials')
+    .select('*')
+    .eq('schedule_id', params.scheduleId)
+    .eq('date', params.date)
+    .maybeSingle();
+
+  throwSupabaseError('Gagal mengambil materi pembelajaran', error);
+  return data ? toLearningMaterial(data as LearningMaterialRow) : null;
+}
+
+export async function createLearningMaterial(material: LearningMaterial) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    mockLearningMaterials.unshift(material);
+    return material;
+  }
+
+  const { data, error } = await supabase
+    .from('learning_materials')
+    .insert({
+      id: material.id,
+      teacher_id: material.teacherId,
+      schedule_id: material.scheduleId,
+      date: material.date,
+      meeting: material.meeting,
+      title: material.title,
+      description: material.description,
+      validation_status: material.validationStatus,
+      alignment_status: material.alignmentStatus,
+    })
+    .select()
+    .single();
+
+  if (error?.message.includes('duplicate key')) {
+    throw new RepositoryError('Materi untuk jadwal dan tanggal tersebut sudah tersedia.', 409);
+  }
+
+  throwSupabaseError('Gagal menyimpan materi pembelajaran', error);
+  return toLearningMaterial(data as LearningMaterialRow);
+}
+
+async function getAssessmentQuestions(assessmentIds: string[]) {
+  const supabase = getSupabaseAdmin();
+  const questionMap = new Map<string, AssessmentQuestion[]>();
+
+  if (!assessmentIds.length) {
+    return questionMap;
+  }
+
+  if (!supabase) {
+    mockAssessments.forEach((assessment) => {
+      questionMap.set(assessment.id, assessment.questions);
+    });
+    return questionMap;
+  }
+
+  const { data, error } = await supabase
+    .from('assessment_questions')
+    .select('*')
+    .in('assessment_id', assessmentIds)
+    .order('position', { ascending: true });
+
+  throwSupabaseError('Gagal mengambil soal assessment', error);
+
+  (data ?? []).forEach((row) => {
+    const questionRow = row as AssessmentQuestionRow;
+    const current = questionMap.get(questionRow.assessment_id) ?? [];
+    questionMap.set(questionRow.assessment_id, [...current, toAssessmentQuestion(questionRow)]);
   });
+
+  return questionMap;
+}
+
+async function getAssessmentStudentStatuses(assessmentIds: string[]) {
+  const supabase = getSupabaseAdmin();
+  const statusMap = new Map<string, AssessmentRecord['studentStatuses']>();
+
+  if (!assessmentIds.length) {
+    return statusMap;
+  }
+
+  if (!supabase) {
+    mockAssessments.forEach((assessment) => {
+      statusMap.set(assessment.id, assessment.studentStatuses);
+    });
+    return statusMap;
+  }
+
+  const { data, error } = await supabase
+    .from('assessment_student_statuses')
+    .select('*')
+    .in('assessment_id', assessmentIds);
+
+  throwSupabaseError('Gagal mengambil status assessment siswa', error);
+
+  (data ?? []).forEach((row) => {
+    const statusRow = row as AssessmentStudentStatusRow;
+    const current = statusMap.get(statusRow.assessment_id) ?? [];
+    statusMap.set(statusRow.assessment_id, [
+      ...current,
+      {
+        studentId: statusRow.student_id,
+        completed: statusRow.completed,
+      },
+    ]);
+  });
+
+  return statusMap;
+}
+
+async function hydrateAssessments(rows: AssessmentRow[]) {
+  const assessmentIds = rows.map((row) => row.id);
+  const [questionMap, statusMap] = await Promise.all([
+    getAssessmentQuestions(assessmentIds),
+    getAssessmentStudentStatuses(assessmentIds),
+  ]);
+
+  return rows.map((row) =>
+    toAssessment(row, questionMap.get(row.id) ?? [], statusMap.get(row.id) ?? []),
+  );
+}
+
+export async function listAssessments() {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return [...mockAssessments];
+  }
+
+  const { data, error } = await supabase.from('assessments').select('*').order('date', { ascending: false });
+  throwSupabaseError('Gagal mengambil assessment', error);
+  return hydrateAssessments((data ?? []) as AssessmentRow[]);
+}
+
+export async function getAssessmentById(assessmentId: string) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return mockAssessments.find((assessment) => assessment.id === assessmentId) ?? null;
+  }
+
+  const { data, error } = await supabase.from('assessments').select('*').eq('id', assessmentId).maybeSingle();
+  throwSupabaseError('Gagal mengambil assessment', error);
+
+  if (!data) {
+    return null;
+  }
+
+  const [assessment] = await hydrateAssessments([data as AssessmentRow]);
+  return assessment ?? null;
+}
+
+export async function getAssessment(params: {
+  type: AssessmentRecord['type'];
+  scheduleId: string;
+  date: string;
+  meeting: number;
+}) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return (
+      mockAssessments.find(
+        (assessment) =>
+          assessment.type === params.type &&
+          assessment.scheduleId === params.scheduleId &&
+          assessment.date === params.date &&
+          assessment.meeting === params.meeting,
+      ) ?? null
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('*')
+    .eq('type', params.type)
+    .eq('schedule_id', params.scheduleId)
+    .eq('date', params.date)
+    .eq('meeting', params.meeting)
+    .maybeSingle();
+
+  throwSupabaseError('Gagal mengambil assessment', error);
+
+  if (!data) {
+    return null;
+  }
+
+  const [assessment] = await hydrateAssessments([data as AssessmentRow]);
+  return assessment ?? null;
+}
+
+export async function createAssessments(assessments: AssessmentRecord[]) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    mockAssessments.unshift(...assessments);
+    return assessments;
+  }
+
+  const saved: AssessmentRecord[] = [];
+
+  for (const assessment of assessments) {
+    const { data, error } = await supabase
+      .from('assessments')
+      .insert({
+        id: assessment.id,
+        type: assessment.type,
+        teacher_id: assessment.teacherId,
+        schedule_id: assessment.scheduleId,
+        class_id: assessment.classId,
+        subject_id: assessment.subjectId,
+        date: assessment.date,
+        meeting: assessment.meeting,
+        question_count: assessment.questionCount,
+        status: assessment.status,
+      })
+      .select()
+      .single();
+
+    if (error?.message.includes('duplicate key')) {
+      throw new RepositoryError('Assessment untuk pertemuan ini sudah tersedia.', 409);
+    }
+
+    throwSupabaseError('Gagal menyimpan assessment', error);
+
+    const questionRows = assessment.questions.map((question, index) => ({
+      id: question.id,
+      assessment_id: assessment.id,
+      question: question.question,
+      options: question.options,
+      answer: question.answer,
+      position: index + 1,
+    }));
+
+    const statusRows = assessment.studentStatuses.map((status) => ({
+      assessment_id: assessment.id,
+      student_id: status.studentId,
+      completed: status.completed,
+      completed_at: status.completed ? new Date().toISOString() : null,
+    }));
+
+    if (questionRows.length) {
+      const { error: questionError } = await supabase.from('assessment_questions').insert(questionRows);
+      throwSupabaseError('Gagal menyimpan soal assessment', questionError);
+    }
+
+    if (statusRows.length) {
+      const { error: statusError } = await supabase.from('assessment_student_statuses').insert(statusRows);
+      throwSupabaseError('Gagal menyimpan status assessment siswa', statusError);
+    }
+
+    saved.push(toAssessment(data as AssessmentRow, assessment.questions, assessment.studentStatuses));
+  }
+
+  return saved;
+}
+
+export async function completeAssessmentForStudent(assessmentId: string, studentId: string) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    const assessment = mockAssessments.find((item) => item.id === assessmentId);
+    if (!assessment) {
+      return null;
+    }
+
+    assessment.studentStatuses = assessment.studentStatuses.map((status) =>
+      status.studentId === studentId ? { ...status, completed: true } : status,
+    );
+    return assessment;
+  }
+
+  const { error } = await supabase
+    .from('assessment_student_statuses')
+    .update({ completed: true, completed_at: new Date().toISOString() })
+    .eq('assessment_id', assessmentId)
+    .eq('student_id', studentId);
+
+  throwSupabaseError('Gagal memperbarui status assessment siswa', error);
+  return getAssessmentById(assessmentId);
+}
+
+export async function listTeacherQuestionnaires() {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return [...mockQuestionnaires];
+  }
+
+  const { data, error } = await supabase
+    .from('teacher_questionnaires')
+    .select('*')
+    .order('date', { ascending: false });
+
+  throwSupabaseError('Gagal mengambil kuisioner guru', error);
+  return (data ?? []).map((row) => toTeacherQuestionnaire(row as TeacherQuestionnaireRow));
+}
+
+export async function getTeacherQuestionnaire(params: {
+  studentId: string;
+  teacherId: string;
+  scheduleId: string;
+  date: string;
+}) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return (
+      mockQuestionnaires.find(
+        (questionnaire) =>
+          questionnaire.studentId === params.studentId &&
+          questionnaire.teacherId === params.teacherId &&
+          questionnaire.scheduleId === params.scheduleId &&
+          questionnaire.date === params.date,
+      ) ?? null
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('teacher_questionnaires')
+    .select('*')
+    .eq('student_id', params.studentId)
+    .eq('teacher_id', params.teacherId)
+    .eq('schedule_id', params.scheduleId)
+    .eq('date', params.date)
+    .maybeSingle();
+
+  throwSupabaseError('Gagal mengambil kuisioner guru', error);
+  return data ? toTeacherQuestionnaire(data as TeacherQuestionnaireRow) : null;
+}
+
+export async function completeTeacherQuestionnaire(questionnaire: TeacherQuestionnaire) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    const existingIndex = mockQuestionnaires.findIndex(
+      (item) =>
+        item.studentId === questionnaire.studentId &&
+        item.teacherId === questionnaire.teacherId &&
+        item.scheduleId === questionnaire.scheduleId &&
+        item.date === questionnaire.date,
+    );
+
+    if (existingIndex >= 0) {
+      mockQuestionnaires[existingIndex] = {
+        ...mockQuestionnaires[existingIndex],
+        completed: true,
+      };
+      return mockQuestionnaires[existingIndex];
+    }
+
+    mockQuestionnaires.unshift(questionnaire);
+    return questionnaire;
+  }
+
+  const existing = await getTeacherQuestionnaire({
+    studentId: questionnaire.studentId,
+    teacherId: questionnaire.teacherId,
+    scheduleId: questionnaire.scheduleId,
+    date: questionnaire.date,
+  });
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('teacher_questionnaires')
+      .update({ completed: true })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    throwSupabaseError('Gagal memperbarui kuisioner guru', error);
+    return toTeacherQuestionnaire(data as TeacherQuestionnaireRow);
+  }
+
+  const { data, error } = await supabase
+    .from('teacher_questionnaires')
+    .insert({
+      id: questionnaire.id,
+      student_id: questionnaire.studentId,
+      teacher_id: questionnaire.teacherId,
+      schedule_id: questionnaire.scheduleId,
+      date: questionnaire.date,
+      completed: true,
+    })
+    .select()
+    .single();
+
+  throwSupabaseError('Gagal menyimpan kuisioner guru', error);
+  return toTeacherQuestionnaire(data as TeacherQuestionnaireRow);
+}
+
+export async function listStudentJournals() {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return [...mockStudentJournals];
+  }
+
+  const { data, error } = await supabase.from('student_journals').select('*').order('date', { ascending: false });
+  throwSupabaseError('Gagal mengambil jurnal siswa', error);
+  return (data ?? []).map((row) => toStudentJournal(row as StudentJournalRow));
+}
+
+export async function getStudentJournal(params: { studentId: string; scheduleId: string; date: string }) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    return (
+      mockStudentJournals.find(
+        (journal) =>
+          journal.studentId === params.studentId &&
+          journal.scheduleId === params.scheduleId &&
+          journal.date === params.date,
+      ) ?? null
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('student_journals')
+    .select('*')
+    .eq('student_id', params.studentId)
+    .eq('schedule_id', params.scheduleId)
+    .eq('date', params.date)
+    .maybeSingle();
+
+  throwSupabaseError('Gagal mengambil jurnal siswa', error);
+  return data ? toStudentJournal(data as StudentJournalRow) : null;
+}
+
+export async function createStudentJournal(journal: StudentJournal) {
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    mockStudentJournals.unshift(journal);
+    return journal;
+  }
+
+  const { data, error } = await supabase
+    .from('student_journals')
+    .insert({
+      id: journal.id,
+      student_id: journal.studentId,
+      schedule_id: journal.scheduleId,
+      date: journal.date,
+      material_studied: journal.materialStudied,
+      summary: journal.summary,
+      tasks: journal.tasks,
+      learning_obstacles: journal.learningObstacles,
+      attachment_name: journal.attachmentName,
+      entry_status: journal.entryStatus,
+      review_status: journal.reviewStatus,
+      notes: journal.notes,
+      validation_status: journal.validationStatus,
+    })
+    .select()
+    .single();
+
+  if (error?.message.includes('duplicate key')) {
+    throw new RepositoryError('Jurnal sudah pernah diisi untuk tanggal dan mata pelajaran yang sama.', 409);
+  }
+
+  throwSupabaseError('Gagal menyimpan jurnal siswa', error);
+  return toStudentJournal(data as StudentJournalRow);
+}
+
+export async function updateLearningMaterialValidation(
+  materialId: string,
+  status: LearningMaterial['validationStatus'],
+) {
+  const alignmentStatus: LearningMaterial['alignmentStatus'] = status === 'Valid' ? 'Sesuai' : 'Perlu Cek';
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    const materialIndex = mockLearningMaterials.findIndex((material) => material.id === materialId);
+    if (materialIndex < 0) {
+      throw new RepositoryError('Materi pembelajaran tidak ditemukan.', 404);
+    }
+
+    mockLearningMaterials[materialIndex] = {
+      ...mockLearningMaterials[materialIndex],
+      validationStatus: status,
+      alignmentStatus,
+    };
+    return mockLearningMaterials[materialIndex];
+  }
+
+  const { data, error } = await supabase
+    .from('learning_materials')
+    .update({
+      validation_status: status,
+      alignment_status: alignmentStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', materialId)
+    .select()
+    .single();
+
+  throwSupabaseError('Gagal memperbarui validasi materi', error);
+  return toLearningMaterial(data as LearningMaterialRow);
+}
+
+export async function updateStudentJournalValidation(
+  journalId: string,
+  status: StudentJournal['validationStatus'],
+) {
+  const reviewStatus: StudentJournal['reviewStatus'] = status === 'Valid' ? 'Tervalidasi' : 'Perlu Revisi';
+  const notes =
+    status === 'Valid'
+      ? 'Jurnal tervalidasi oleh kurikulum.'
+      : 'Jurnal ditolak. Perlu pembaruan isi dan kesesuaian materi.';
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    const journalIndex = mockStudentJournals.findIndex((journal) => journal.id === journalId);
+    if (journalIndex < 0) {
+      throw new RepositoryError('Jurnal siswa tidak ditemukan.', 404);
+    }
+
+    mockStudentJournals[journalIndex] = {
+      ...mockStudentJournals[journalIndex],
+      validationStatus: status,
+      reviewStatus,
+      notes,
+    };
+    return mockStudentJournals[journalIndex];
+  }
+
+  const { data, error } = await supabase
+    .from('student_journals')
+    .update({
+      validation_status: status,
+      review_status: reviewStatus,
+      notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', journalId)
+    .select()
+    .single();
+
+  throwSupabaseError('Gagal memperbarui validasi jurnal siswa', error);
+  return toStudentJournal(data as StudentJournalRow);
 }
 
 export async function deleteMasterData(kind: 'student' | 'teacher' | 'class' | 'subject' | 'schedule', id: string) {

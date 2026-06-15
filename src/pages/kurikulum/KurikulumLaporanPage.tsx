@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
@@ -32,6 +33,7 @@ export function KurikulumLaporanPage() {
   const { teachers, teacherAttendances, subjects, schedules, learningMaterials, studentJournals, classes } = useAppData();
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
   const [activeReport, setActiveReport] = useState<'teachers' | 'activities' | 'journals'>('teachers');
+  const [reportSearch, setReportSearch] = useState('');
 
   const teacherReportRows: TeacherReportRow[] = teachers.map((teacher) => ({
     id: teacher.id,
@@ -83,10 +85,24 @@ export function KurikulumLaporanPage() {
     { key: 'totalJurnal', header: 'Total Jurnal', render: (item) => item.totalJurnal },
     { key: 'tervalidasi', header: 'Tervalidasi', render: (item) => item.tervalidasi },
   ];
+
+  const normalizedReportSearch = reportSearch.trim().toLowerCase();
+  const matchesReportSearch = (values: Array<string | number>) =>
+    !normalizedReportSearch || values.some((value) => String(value).toLowerCase().includes(normalizedReportSearch));
+  const filteredTeacherReportRows = teacherReportRows.filter((row) =>
+    matchesReportSearch([row.teacherName, row.totalPresensi, row.hadir]),
+  );
+  const filteredActivityReportRows = activityReportRows.filter((row) =>
+    matchesReportSearch([row.subject, row.materi, row.jurnal]),
+  );
+  const filteredJournalReportRows = journalReportRows.filter((row) =>
+    matchesReportSearch([row.className, row.totalJurnal, row.tervalidasi]),
+  );
+
   const reportTabs = [
-    { id: 'teachers' as const, label: 'Kehadiran Guru', count: teacherReportRows.length },
-    { id: 'activities' as const, label: 'Aktivitas Pembelajaran', count: activityReportRows.length },
-    { id: 'journals' as const, label: 'Jurnal Siswa', count: journalReportRows.length },
+    { id: 'teachers' as const, label: 'Kehadiran Guru', count: filteredTeacherReportRows.length },
+    { id: 'activities' as const, label: 'Aktivitas Pembelajaran', count: filteredActivityReportRows.length },
+    { id: 'journals' as const, label: 'Jurnal Siswa', count: filteredJournalReportRows.length },
   ];
 
   const buildCsv = () => {
@@ -239,6 +255,18 @@ export function KurikulumLaporanPage() {
         />
       </div>
 
+      <FilterBar>
+        <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-3">
+          <span>Cari Laporan</span>
+          <input
+            value={reportSearch}
+            onChange={(event) => setReportSearch(event.target.value)}
+            className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+            placeholder="Cari nama guru, mapel, kelas, atau jumlah data"
+          />
+        </label>
+      </FilterBar>
+
       <section className="rounded-3xl border border-brand-100 bg-white p-4 shadow-soft">
         <div className="flex flex-wrap gap-2">
           {reportTabs.map((tab) => (
@@ -258,13 +286,13 @@ export function KurikulumLaporanPage() {
 
         <div className="mt-4">
           {activeReport === 'teachers' ? (
-            <DataTable data={teacherReportRows} columns={teacherColumns} getRowKey={(item) => item.id} />
+            <DataTable data={filteredTeacherReportRows} columns={teacherColumns} getRowKey={(item) => item.id} />
           ) : null}
           {activeReport === 'activities' ? (
-            <DataTable data={activityReportRows} columns={activityColumns} getRowKey={(item) => item.id} />
+            <DataTable data={filteredActivityReportRows} columns={activityColumns} getRowKey={(item) => item.id} />
           ) : null}
           {activeReport === 'journals' ? (
-            <DataTable data={journalReportRows} columns={journalColumns} getRowKey={(item) => item.id} />
+            <DataTable data={filteredJournalReportRows} columns={journalColumns} getRowKey={(item) => item.id} />
           ) : null}
         </div>
       </section>

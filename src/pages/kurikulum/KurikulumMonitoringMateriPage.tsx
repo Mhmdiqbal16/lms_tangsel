@@ -19,11 +19,12 @@ interface MaterialMonitoringRow {
 
 export function KurikulumMonitoringMateriPage() {
   const { teacherAttendances, schedules, teachers, classes, subjects, learningMaterials } = useAppData();
+  const [searchTerm, setSearchTerm] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  const rows: MaterialMonitoringRow[] = teacherAttendances
+  const baseRows: MaterialMonitoringRow[] = teacherAttendances
     .map((attendance) => {
       const schedule = schedules.find((item) => item.id === attendance.scheduleId);
       const material = learningMaterials.find(
@@ -40,10 +41,32 @@ export function KurikulumMonitoringMateriPage() {
         alignment: material?.alignmentStatus ?? 'Belum Diisi',
       };
     })
+    .sort((first, second) => second.date.localeCompare(first.date));
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const rows = baseRows
     .filter((item) => (teacherFilter === 'all' ? true : item.teacherName === teacherFilter))
     .filter((item) => (classFilter === 'all' ? true : item.className === classFilter))
     .filter((item) => (dateFilter ? item.date === dateFilter : true))
-    .sort((first, second) => second.date.localeCompare(first.date));
+    .filter((item) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [
+        item.teacherName,
+        item.className,
+        item.subject,
+        item.date,
+        formatDateID(item.date),
+        item.meeting,
+        item.material,
+        item.alignment,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedSearch);
+    });
 
   const columns: TableColumn<MaterialMonitoringRow>[] = [
     { key: 'teacherName', header: 'Guru', render: (item) => item.teacherName },
@@ -71,6 +94,16 @@ export function KurikulumMonitoringMateriPage() {
       />
 
       <FilterBar>
+        <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-3">
+          <span>Cari</span>
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+            placeholder="Cari guru, kelas, mapel, materi, tanggal, atau status"
+          />
+        </label>
+
         <label className="space-y-2 text-sm font-medium text-slate-700">
           <span>Guru</span>
           <select
@@ -79,7 +112,7 @@ export function KurikulumMonitoringMateriPage() {
             className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
           >
             <option value="all">Semua guru</option>
-            {Array.from(new Set(rows.map((item) => item.teacherName))).map((item) => (
+            {Array.from(new Set(baseRows.map((item) => item.teacherName))).map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -95,7 +128,7 @@ export function KurikulumMonitoringMateriPage() {
             className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
           >
             <option value="all">Semua kelas</option>
-            {Array.from(new Set(rows.map((item) => item.className))).map((item) => (
+            {Array.from(new Set(baseRows.map((item) => item.className))).map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -124,4 +157,3 @@ export function KurikulumMonitoringMateriPage() {
     </div>
   );
 }
-

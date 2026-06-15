@@ -65,20 +65,19 @@ export function getJournalEligibility(params: {
     (item) => item.studentId === studentId && item.scheduleId === scheduleId && item.date === sessionDate,
   );
   const questionnaireDone = questionnaire?.completed ?? false;
-  const canSubmit =
-    withinWindow && pretestState.completed && posttestState.completed && questionnaireDone && !duplicate;
+  const canSubmit = withinWindow && pretestState.completed && !duplicate;
 
   let status: JournalEligibilityResult['status'] = 'Belum';
-  let message = 'Lengkapi pretest, posttest, dan kuisioner guru untuk membuka jurnal.';
+  let message = 'Selesaikan pretest terlebih dahulu untuk membuka form jurnal.';
 
   if (duplicate) {
     status = 'Selesai';
-    message = 'Jurnal untuk mata pelajaran dan tanggal ini sudah pernah diisi.';
+    message = 'Jurnal sudah dikirim. Posttest dan kuisioner dapat dikerjakan.';
   } else if (locked) {
     status = 'Terkunci';
     message = 'Batas pengisian jurnal sudah melewati H+1 dari jadwal pembelajaran.';
   } else if (canSubmit) {
-    message = 'Seluruh syarat terpenuhi. Jurnal siap diisi.';
+    message = 'Pretest selesai. Form jurnal siap diisi.';
   }
 
   return {

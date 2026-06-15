@@ -1,0 +1,311 @@
+Project WEB_SMKN2 {
+  database_type: 'PostgreSQL'
+  Note: 'ERD generated from backend/supabase/schema.sql'
+}
+
+Enum user_role {
+  siswa
+  guru
+  kurikulum
+  admin
+}
+
+Enum attendance_status {
+  Hadir
+  Izin
+  Alfa
+}
+
+Enum teacher_attendance_status {
+  Hadir
+  Izin
+  "Belum Presensi"
+}
+
+Enum validation_status {
+  Menunggu
+  Valid
+  Ditolak
+}
+
+Enum alignment_status {
+  Sesuai
+  "Belum Diisi"
+  "Perlu Cek"
+}
+
+Enum assessment_type {
+  pretest
+  posttest
+}
+
+Enum active_status {
+  Aktif
+  Nonaktif
+}
+
+Table app_users {
+  id text [pk]
+  role user_role [not null]
+  identifier text [not null]
+  password_hash text [not null]
+  name text [not null]
+  reference_id text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (role, identifier) [unique, name: 'app_users_role_identifier_key']
+  }
+}
+
+Table subjects {
+  id text [pk]
+  name text [not null, unique]
+  short_name text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table teachers {
+  id text [pk]
+  user_id text
+  name text [not null]
+  nip text [not null, unique]
+  email text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table teacher_subjects {
+  teacher_id text [not null]
+  subject_id text [not null]
+
+  indexes {
+    (teacher_id, subject_id) [pk]
+  }
+}
+
+Table classes {
+  id text [pk]
+  name text [not null, unique]
+  major text [not null]
+  homeroom_teacher_id text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table students {
+  id text [pk]
+  user_id text
+  name text [not null]
+  nisn text [not null, unique]
+  class_id text [not null]
+  email text [not null]
+  avatar text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table curricula {
+  id text [pk]
+  user_id text
+  name text [not null]
+  nip text [not null, unique]
+  employee_id text [not null, unique]
+  email text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table admins {
+  id text [pk]
+  user_id text
+  name text [not null]
+  nip text [not null, unique]
+  email text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table schedules {
+  id text [pk]
+  class_id text [not null]
+  subject_id text [not null]
+  teacher_id text [not null]
+  day smallint [not null, note: '1 sampai 5']
+  start_time time [not null]
+  end_time time [not null]
+  room text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'Check constraint: start_time < end_time'
+}
+
+Table teacher_attendances {
+  id text [pk]
+  teacher_id text [not null]
+  schedule_id text [not null]
+  date date [not null]
+  status teacher_attendance_status [not null]
+  notes text [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (teacher_id, schedule_id, date) [unique]
+  }
+}
+
+Table student_attendances {
+  id text [pk]
+  student_id text [not null]
+  schedule_id text [not null]
+  date date [not null]
+  status attendance_status [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (student_id, schedule_id, date) [unique]
+  }
+}
+
+Table learning_materials {
+  id text [pk]
+  teacher_id text [not null]
+  schedule_id text [not null]
+  date date [not null]
+  meeting integer [not null, note: 'Harus lebih dari 0']
+  title text [not null]
+  description text [not null]
+  validation_status validation_status [not null]
+  alignment_status alignment_status [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (schedule_id, date) [unique]
+  }
+}
+
+Table assessments {
+  id text [pk]
+  type assessment_type [not null]
+  teacher_id text [not null]
+  schedule_id text [not null]
+  class_id text [not null]
+  subject_id text [not null]
+  date date [not null]
+  meeting integer [not null, note: 'Harus lebih dari 0']
+  question_count integer [not null, note: '1 sampai 10']
+  status active_status [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (type, schedule_id, date, meeting) [unique]
+  }
+}
+
+Table assessment_questions {
+  id text [pk]
+  assessment_id text [not null]
+  question text [not null]
+  options jsonb [not null]
+  answer text [not null]
+  position integer [not null, note: 'Harus lebih dari 0']
+  created_at timestamptz [not null]
+}
+
+Table assessment_student_statuses {
+  assessment_id text [not null]
+  student_id text [not null]
+  completed boolean [not null]
+  completed_at timestamptz
+
+  indexes {
+    (assessment_id, student_id) [pk]
+  }
+}
+
+Table teacher_questionnaires {
+  id text [pk]
+  student_id text [not null]
+  teacher_id text [not null]
+  schedule_id text [not null]
+  date date [not null]
+  completed boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (student_id, teacher_id, schedule_id, date) [unique]
+  }
+}
+
+Table student_journals {
+  id text [pk]
+  student_id text [not null]
+  schedule_id text [not null]
+  date date [not null]
+  material_studied text [not null]
+  summary text [not null]
+  tasks text [not null]
+  learning_obstacles text [not null]
+  attachment_name text
+  attachment_path text
+  attachment_size bigint
+  attachment_type text
+  entry_status text [not null]
+  review_status text [not null]
+  notes text [not null]
+  validation_status validation_status [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (student_id, schedule_id, date) [unique]
+  }
+}
+
+Ref: teachers.user_id > app_users.id [delete: set null]
+Ref: students.user_id > app_users.id [delete: set null]
+Ref: curricula.user_id > app_users.id [delete: set null]
+Ref: admins.user_id > app_users.id [delete: set null]
+
+Ref: teacher_subjects.teacher_id > teachers.id [delete: cascade]
+Ref: teacher_subjects.subject_id > subjects.id [delete: cascade]
+
+Ref: classes.homeroom_teacher_id > teachers.id [delete: set null]
+Ref: students.class_id > classes.id [delete: restrict]
+
+Ref: schedules.class_id > classes.id [delete: restrict]
+Ref: schedules.subject_id > subjects.id [delete: restrict]
+Ref: schedules.teacher_id > teachers.id [delete: restrict]
+
+Ref: teacher_attendances.teacher_id > teachers.id [delete: restrict]
+Ref: teacher_attendances.schedule_id > schedules.id [delete: restrict]
+
+Ref: student_attendances.student_id > students.id [delete: restrict]
+Ref: student_attendances.schedule_id > schedules.id [delete: restrict]
+
+Ref: learning_materials.teacher_id > teachers.id [delete: restrict]
+Ref: learning_materials.schedule_id > schedules.id [delete: restrict]
+
+Ref: assessments.teacher_id > teachers.id [delete: restrict]
+Ref: assessments.schedule_id > schedules.id [delete: restrict]
+Ref: assessments.class_id > classes.id [delete: restrict]
+Ref: assessments.subject_id > subjects.id [delete: restrict]
+
+Ref: assessment_questions.assessment_id > assessments.id [delete: cascade]
+Ref: assessment_student_statuses.assessment_id > assessments.id [delete: cascade]
+Ref: assessment_student_statuses.student_id > students.id [delete: cascade]
+
+Ref: teacher_questionnaires.student_id > students.id [delete: restrict]
+Ref: teacher_questionnaires.teacher_id > teachers.id [delete: restrict]
+Ref: teacher_questionnaires.schedule_id > schedules.id [delete: restrict]
+
+Ref: student_journals.student_id > students.id [delete: restrict]
+Ref: student_journals.schedule_id > schedules.id [delete: restrict]

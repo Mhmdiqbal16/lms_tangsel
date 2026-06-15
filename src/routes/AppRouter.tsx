@@ -18,9 +18,11 @@ import { KurikulumMonitoringMateriPage } from '@/pages/kurikulum/KurikulumMonito
 import { KurikulumValidasiPage } from '@/pages/kurikulum/KurikulumValidasiPage';
 import { SiswaAbsensiPage } from '@/pages/siswa/SiswaAbsensiPage';
 import { SiswaAkunPage } from '@/pages/siswa/SiswaAkunPage';
+import { SiswaAssessmentPage } from '@/pages/siswa/SiswaAssessmentPage';
 import { SiswaDashboardPage } from '@/pages/siswa/SiswaDashboardPage';
 import { SiswaJadwalPage } from '@/pages/siswa/SiswaJadwalPage';
 import { SiswaJurnalPage } from '@/pages/siswa/SiswaJurnalPage';
+import { SiswaKuisionerPage } from '@/pages/siswa/SiswaKuisionerPage';
 import { SiswaRiwayatJurnalPage } from '@/pages/siswa/SiswaRiwayatJurnalPage';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { RoleLandingRedirect } from '@/routes/RoleLandingRedirect';
@@ -49,6 +51,9 @@ export function AppRouter() {
               element={<ProtectedRoute allowedRoles={['siswa']} requiredPermission="student.journal.create" />}
             >
               <Route path="/siswa/jurnal" element={<SiswaJurnalPage />} />
+              <Route path="/siswa/pretest" element={<SiswaAssessmentPage type="pretest" />} />
+              <Route path="/siswa/posttest" element={<SiswaAssessmentPage type="posttest" />} />
+              <Route path="/siswa/kuisioner" element={<SiswaKuisionerPage />} />
             </Route>
             <Route
               element={

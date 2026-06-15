@@ -80,6 +80,10 @@ export function AdminMasterDataPage() {
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
   const [accountSearch, setAccountSearch] = useState('');
   const [accountRoleFilter, setAccountRoleFilter] = useState<AccountRoleFilter>('all');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [classSearch, setClassSearch] = useState('');
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [scheduleClassFilter, setScheduleClassFilter] = useState('all');
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const [databaseStudents, setDatabaseStudents] = useState<StudentProfile[]>([]);
   const [databaseTeachers, setDatabaseTeachers] = useState<TeacherProfile[]>([]);
@@ -413,11 +417,68 @@ export function AdminMasterDataPage() {
     return matchesRole && searchableText.includes(normalizedAccountSearch);
   });
 
+  const normalizedTeacherSearch = teacherSearch.trim().toLowerCase();
+  const filteredTeachers = databaseTeachers.filter((teacher) => {
+    if (!normalizedTeacherSearch) {
+      return true;
+    }
+
+    const subjectText = teacher.subjectIds
+      .map((subjectId) => {
+        const subject = databaseSubjects.find((item) => item.id === subjectId);
+        return `${subject?.name ?? ''} ${subject?.shortName ?? ''}`;
+      })
+      .join(' ');
+    const searchableText = `${teacher.name} ${teacher.nip} ${teacher.email} ${subjectText}`.toLowerCase();
+
+    return searchableText.includes(normalizedTeacherSearch);
+  });
+
+  const normalizedClassSearch = classSearch.trim().toLowerCase();
+  const filteredClasses = databaseClasses.filter((classItem) => {
+    if (!normalizedClassSearch) {
+      return true;
+    }
+
+    const homeroomTeacher = databaseTeachers.find((teacher) => teacher.id === classItem.homeroomTeacherId)?.name ?? '';
+    const studentCount = databaseStudents.filter((student) => student.classId === classItem.id).length;
+    const searchableText = `${classItem.name} ${classItem.major} ${homeroomTeacher} ${studentCount}`.toLowerCase();
+
+    return searchableText.includes(normalizedClassSearch);
+  });
+
+  const normalizedSubjectSearch = subjectSearch.trim().toLowerCase();
+  const filteredSubjects = databaseSubjects.filter((subject) => {
+    if (!normalizedSubjectSearch) {
+      return true;
+    }
+
+    const scheduleCount = databaseSchedules.filter((schedule) => schedule.subjectId === subject.id).length;
+    const searchableText = `${subject.name} ${subject.shortName} ${scheduleCount}`.toLowerCase();
+
+    return searchableText.includes(normalizedSubjectSearch);
+  });
+
   const accountColumns: TableColumn<AccountRecord>[] = [
-    { key: 'name', header: 'Nama', render: (item) => item.name },
+    {
+      key: 'name',
+      header: 'Nama',
+      render: (item) => item.name,
+      className: 'max-w-[260px] break-words [overflow-wrap:anywhere]',
+    },
     { key: 'role', header: 'Role', render: (item) => <Badge variant="blue">{getRoleLabel(item.role)}</Badge> },
-    { key: 'identifier', header: 'NISN/NIP/Username', render: (item) => item.identifier },
-    { key: 'reference', header: 'Profil', render: (item) => item.referenceId },
+    {
+      key: 'identifier',
+      header: 'NISN/NIP/Username',
+      render: (item) => item.identifier,
+      className: 'max-w-[220px] break-words [overflow-wrap:anywhere]',
+    },
+    {
+      key: 'reference',
+      header: 'Profil',
+      render: (item) => item.referenceId,
+      className: 'max-w-[220px] break-words [overflow-wrap:anywhere]',
+    },
     {
       key: 'actions',
       header: 'Aksi',
@@ -450,8 +511,9 @@ export function AdminMasterDataPage() {
     {
       key: 'actions',
       header: 'Aksi',
+      className: 'min-w-[132px] whitespace-nowrap',
       render: (item) => (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-2">
           <button
             type="button"
             onClick={() => setTeacherForm(item)}
@@ -542,7 +604,7 @@ export function AdminMasterDataPage() {
 
   const scheduleColumns: TableColumn<Schedule>[] = [
     { key: 'day', header: 'Hari', render: (item) => formatDayName(item.day) },
-    { key: 'time', header: 'Jam', render: (item) => `${item.startTime} - ${item.endTime}` },
+    { key: 'time', header: 'Waktu Pelajaran', render: (item) => `${item.startTime} - ${item.endTime}` },
     {
       key: 'class',
       header: 'Kelas',
@@ -582,6 +644,11 @@ export function AdminMasterDataPage() {
       ),
     },
   ];
+
+  const filteredSchedules = databaseSchedules
+    .filter((schedule) => scheduleClassFilter === 'all' || schedule.classId === scheduleClassFilter)
+    .slice()
+    .sort((first, second) => first.day - second.day || first.startTime.localeCompare(second.startTime));
 
   return (
     <div className="space-y-6">
@@ -868,7 +935,38 @@ export function AdminMasterDataPage() {
               </button>
             </div>
           </form>
-          <DataTable data={databaseTeachers} columns={teacherColumns} getRowKey={(item) => item.id} />
+          <FilterBar>
+            <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+              <span>Cari Guru</span>
+              <input
+                value={teacherSearch}
+                onChange={(event) => setTeacherSearch(event.target.value)}
+                className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Cari nama, NIP, email, atau mapel"
+              />
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-slate-600">
+              <span>
+                <span className="font-semibold text-slate-900">{filteredTeachers.length}</span> dari{' '}
+                {databaseTeachers.length} guru
+              </span>
+              <button
+                type="button"
+                disabled={!teacherSearch.trim()}
+                onClick={() => setTeacherSearch('')}
+                className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              >
+                Reset
+              </button>
+            </div>
+          </FilterBar>
+          <DataTable
+            data={filteredTeachers}
+            columns={teacherColumns}
+            getRowKey={(item) => item.id}
+            emptyTitle="Guru tidak ditemukan"
+            emptyDescription="Tidak ada guru yang cocok dengan pencarian saat ini."
+          />
         </section>
       ) : null}
 
@@ -922,7 +1020,38 @@ export function AdminMasterDataPage() {
               </button>
             </div>
           </form>
-          <DataTable data={databaseClasses} columns={classColumns} getRowKey={(item) => item.id} />
+          <FilterBar>
+            <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+              <span>Cari Kelas</span>
+              <input
+                value={classSearch}
+                onChange={(event) => setClassSearch(event.target.value)}
+                className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Cari kelas, jurusan, wali kelas, atau jumlah siswa"
+              />
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-slate-600">
+              <span>
+                <span className="font-semibold text-slate-900">{filteredClasses.length}</span> dari{' '}
+                {databaseClasses.length} kelas
+              </span>
+              <button
+                type="button"
+                disabled={!classSearch.trim()}
+                onClick={() => setClassSearch('')}
+                className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              >
+                Reset
+              </button>
+            </div>
+          </FilterBar>
+          <DataTable
+            data={filteredClasses}
+            columns={classColumns}
+            getRowKey={(item) => item.id}
+            emptyTitle="Kelas tidak ditemukan"
+            emptyDescription="Tidak ada kelas yang cocok dengan pencarian saat ini."
+          />
         </section>
       ) : null}
 
@@ -964,7 +1093,38 @@ export function AdminMasterDataPage() {
               </button>
             </div>
           </form>
-          <DataTable data={databaseSubjects} columns={subjectColumns} getRowKey={(item) => item.id} />
+          <FilterBar>
+            <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+              <span>Cari Mapel</span>
+              <input
+                value={subjectSearch}
+                onChange={(event) => setSubjectSearch(event.target.value)}
+                className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                placeholder="Cari nama mapel, singkatan, atau jumlah jadwal"
+              />
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-slate-600">
+              <span>
+                <span className="font-semibold text-slate-900">{filteredSubjects.length}</span> dari{' '}
+                {databaseSubjects.length} mapel
+              </span>
+              <button
+                type="button"
+                disabled={!subjectSearch.trim()}
+                onClick={() => setSubjectSearch('')}
+                className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              >
+                Reset
+              </button>
+            </div>
+          </FilterBar>
+          <DataTable
+            data={filteredSubjects}
+            columns={subjectColumns}
+            getRowKey={(item) => item.id}
+            emptyTitle="Mapel tidak ditemukan"
+            emptyDescription="Tidak ada mata pelajaran yang cocok dengan pencarian saat ini."
+          />
         </section>
       ) : null}
 
@@ -978,71 +1138,92 @@ export function AdminMasterDataPage() {
               {scheduleForm.id ? <Badge variant="yellow">Mode edit</Badge> : null}
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <select
-                value={scheduleForm.day}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, day: Number(event.target.value) }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
-              >
-                {dayOptions.map((day) => (
-                  <option key={day} value={day}>
-                    {formatDayName(day)}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={scheduleForm.classId}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, classId: event.target.value }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
-              >
-                <option value="">Pilih kelas</option>
-                {databaseClasses.map((classItem) => (
-                  <option key={classItem.id} value={classItem.id}>
-                    {classItem.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={scheduleForm.subjectId}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, subjectId: event.target.value }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
-              >
-                <option value="">Pilih mapel</option>
-                {databaseSubjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={scheduleForm.teacherId}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, teacherId: event.target.value }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
-              >
-                <option value="">Pilih guru</option>
-                {databaseTeachers.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="time"
-                value={scheduleForm.startTime}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, startTime: event.target.value }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
-              />
-              <input
-                type="time"
-                value={scheduleForm.endTime}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, endTime: event.target.value }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
-              />
-              <input
-                value={scheduleForm.room}
-                onChange={(event) => setScheduleForm((current) => ({ ...current, room: event.target.value }))}
-                className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none md:col-span-3"
-                placeholder="Ruang belajar"
-              />
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Hari Pelajaran</span>
+                <select
+                  value={scheduleForm.day}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, day: Number(event.target.value) }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                >
+                  {dayOptions.map((day) => (
+                    <option key={day} value={day}>
+                      {formatDayName(day)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Kelas</span>
+                <select
+                  value={scheduleForm.classId}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, classId: event.target.value }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                >
+                  <option value="">Pilih kelas</option>
+                  {databaseClasses.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Mata Pelajaran</span>
+                <select
+                  value={scheduleForm.subjectId}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, subjectId: event.target.value }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                >
+                  <option value="">Pilih mapel</option>
+                  {databaseSubjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Guru Pengajar</span>
+                <select
+                  value={scheduleForm.teacherId}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, teacherId: event.target.value }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                >
+                  <option value="">Pilih guru</option>
+                  {databaseTeachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Jam Mulai Pelajaran</span>
+                <input
+                  type="time"
+                  value={scheduleForm.startTime}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, startTime: event.target.value }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                />
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Jam Selesai Pelajaran</span>
+                <input
+                  type="time"
+                  value={scheduleForm.endTime}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, endTime: event.target.value }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                />
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-3">
+                <span>Ruang Belajar</span>
+                <input
+                  value={scheduleForm.room}
+                  onChange={(event) => setScheduleForm((current) => ({ ...current, room: event.target.value }))}
+                  className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                  placeholder="Contoh: Lab RPL 1"
+                />
+              </label>
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <button
@@ -1061,12 +1242,43 @@ export function AdminMasterDataPage() {
               </button>
             </div>
           </form>
+          <FilterBar>
+            <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+              <span>Filter Kelas</span>
+              <select
+                value={scheduleClassFilter}
+                onChange={(event) => setScheduleClassFilter(event.target.value)}
+                className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                <option value="all">Semua kelas</option>
+                {databaseClasses.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm text-slate-600">
+              <span>
+                <span className="font-semibold text-slate-900">{filteredSchedules.length}</span> dari{' '}
+                {databaseSchedules.length} jadwal
+              </span>
+              <button
+                type="button"
+                disabled={scheduleClassFilter === 'all'}
+                onClick={() => setScheduleClassFilter('all')}
+                className="rounded-xl border border-brand-200 bg-white px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              >
+                Reset
+              </button>
+            </div>
+          </FilterBar>
           <DataTable
-            data={databaseSchedules
-              .slice()
-              .sort((first, second) => first.day - second.day || first.startTime.localeCompare(second.startTime))}
+            data={filteredSchedules}
             columns={scheduleColumns}
             getRowKey={(item) => item.id}
+            emptyTitle="Jadwal tidak ditemukan"
+            emptyDescription="Tidak ada jadwal yang cocok dengan filter kelas saat ini."
           />
         </section>
       ) : null}

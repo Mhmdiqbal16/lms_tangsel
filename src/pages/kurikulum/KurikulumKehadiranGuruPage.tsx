@@ -18,11 +18,12 @@ interface AttendanceRow {
 
 export function KurikulumKehadiranGuruPage() {
   const { teacherAttendances, teachers, schedules, classes, subjects } = useAppData();
+  const [searchTerm, setSearchTerm] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  const rows: AttendanceRow[] = teacherAttendances
+  const baseRows: AttendanceRow[] = teacherAttendances
     .map((attendance) => {
       const schedule = schedules.find((item) => item.id === attendance.scheduleId);
       return {
@@ -35,10 +36,23 @@ export function KurikulumKehadiranGuruPage() {
         status: attendance.status,
       };
     })
+    .sort((first, second) => second.date.localeCompare(first.date));
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const rows = baseRows
     .filter((item) => (teacherFilter === 'all' ? true : item.teacherName === teacherFilter))
     .filter((item) => (classFilter === 'all' ? true : item.className === classFilter))
     .filter((item) => (dateFilter ? item.date === dateFilter : true))
-    .sort((first, second) => second.date.localeCompare(first.date));
+    .filter((item) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [item.teacherName, item.className, item.subject, item.date, formatDateID(item.date), item.time, item.status]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedSearch);
+    });
 
   const columns: TableColumn<AttendanceRow>[] = [
     { key: 'teacherName', header: 'Nama Guru', render: (item) => item.teacherName },
@@ -58,6 +72,16 @@ export function KurikulumKehadiranGuruPage() {
       <PageHeader title="Kehadiran Guru" description="Monitoring kehadiran guru berdasarkan tanggal, kelas, dan mapel." />
 
       <FilterBar>
+        <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-3">
+          <span>Cari</span>
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+            placeholder="Cari guru, kelas, mapel, tanggal, jam, atau status"
+          />
+        </label>
+
         <label className="space-y-2 text-sm font-medium text-slate-700">
           <span>Guru</span>
           <select
@@ -66,7 +90,7 @@ export function KurikulumKehadiranGuruPage() {
             className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
           >
             <option value="all">Semua guru</option>
-            {Array.from(new Set(rows.map((item) => item.teacherName))).map((item) => (
+            {Array.from(new Set(baseRows.map((item) => item.teacherName))).map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -82,7 +106,7 @@ export function KurikulumKehadiranGuruPage() {
             className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
           >
             <option value="all">Semua kelas</option>
-            {Array.from(new Set(rows.map((item) => item.className))).map((item) => (
+            {Array.from(new Set(baseRows.map((item) => item.className))).map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -111,4 +135,3 @@ export function KurikulumKehadiranGuruPage() {
     </div>
   );
 }
-

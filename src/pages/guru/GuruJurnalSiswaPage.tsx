@@ -21,6 +21,7 @@ export function GuruJurnalSiswaPage() {
   const { session } = useAuth();
   const { teachers, studentJournals, schedules, students, classes, subjects } = useAppData();
   const teacher = teachers.find((item) => item.id === session?.referenceId);
+  const [searchTerm, setSearchTerm] = useState('');
   const [classFilter, setClassFilter] = useState('all');
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
@@ -29,7 +30,7 @@ export function GuruJurnalSiswaPage() {
     return null;
   }
 
-  const rows: JournalRow[] = studentJournals
+  const baseRows: JournalRow[] = studentJournals
     .filter((journal) => {
       const schedule = schedules.find((item) => item.id === journal.scheduleId);
       return schedule?.teacherId === teacher.id;
@@ -46,13 +47,26 @@ export function GuruJurnalSiswaPage() {
         status: journal.reviewStatus,
       };
     })
+    .sort((first, second) => second.date.localeCompare(first.date));
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const rows = baseRows
     .filter((item) => (classFilter === 'all' ? true : item.className === classFilter))
     .filter((item) => (subjectFilter === 'all' ? true : item.subject === subjectFilter))
     .filter((item) => (dateFilter ? item.date === dateFilter : true))
-    .sort((first, second) => second.date.localeCompare(first.date));
+    .filter((item) => {
+      if (!normalizedSearch) {
+        return true;
+      }
 
-  const classOptions = Array.from(new Set(rows.map((item) => item.className)));
-  const subjectOptions = Array.from(new Set(rows.map((item) => item.subject)));
+      return [item.studentName, item.className, item.subject, item.date, formatDateID(item.date), item.summary, item.status]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedSearch);
+    });
+
+  const classOptions = Array.from(new Set(baseRows.map((item) => item.className)));
+  const subjectOptions = Array.from(new Set(baseRows.map((item) => item.subject)));
 
   const columns: TableColumn<JournalRow>[] = [
     { key: 'studentName', header: 'Nama Siswa', render: (item) => item.studentName },
@@ -79,6 +93,16 @@ export function GuruJurnalSiswaPage() {
       />
 
       <FilterBar>
+        <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-3">
+          <span>Cari Jurnal</span>
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+            placeholder="Cari siswa, kelas, mapel, tanggal, rangkuman, atau status"
+          />
+        </label>
+
         <label className="space-y-2 text-sm font-medium text-slate-700">
           <span>Kelas</span>
           <select
@@ -132,4 +156,3 @@ export function GuruJurnalSiswaPage() {
     </div>
   );
 }
-

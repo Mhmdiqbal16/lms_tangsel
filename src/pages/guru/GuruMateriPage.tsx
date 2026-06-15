@@ -28,6 +28,7 @@ export function GuruMateriPage() {
   const [meeting, setMeeting] = useState(9);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
 
   if (!teacher) {
@@ -51,7 +52,7 @@ export function GuruMateriPage() {
     })
     .sort((first, second) => second.date.localeCompare(first.date));
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedSchedule) {
@@ -59,7 +60,8 @@ export function GuruMateriPage() {
       return;
     }
 
-    const result = addLearningMaterial({
+    setIsSaving(true);
+    const result = await addLearningMaterial({
       teacherId: teacher.id,
       scheduleId: selectedSchedule.id,
       date,
@@ -67,6 +69,7 @@ export function GuruMateriPage() {
       title,
       description,
     });
+    setIsSaving(false);
 
     setMessage({ tone: result.success ? 'success' : 'warning', text: result.message });
     if (result.success) {
@@ -177,9 +180,10 @@ export function GuruMateriPage() {
 
             <button
               type="submit"
-              className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700"
+              disabled={isSaving}
+              className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Simpan Materi
+              {isSaving ? 'Menyimpan...' : 'Simpan Materi'}
             </button>
           </form>
         </section>

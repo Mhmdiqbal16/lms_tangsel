@@ -31,7 +31,8 @@ export function KurikulumValidasiPage() {
     setMaterialValidation,
   } = useAppData();
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   const rows: ValidationRow[] = [
     ...studentJournals.map((journal) => {
@@ -68,13 +69,21 @@ export function KurikulumValidasiPage() {
 
   const detail = rows.find((item) => item.id === detailId) ?? rows[0];
 
-  const handleValidate = (row: ValidationRow, status: 'Valid' | 'Ditolak') => {
-    if (row.source === 'journal') {
-      setJournalValidation(row.sourceId, status);
-    } else {
-      setMaterialValidation(row.sourceId, status);
-    }
-    setMessage(`${row.type} atas nama ${row.actorName} telah diubah menjadi status ${status}.`);
+  const handleValidate = async (row: ValidationRow, status: 'Valid' | 'Ditolak') => {
+    const pendingKey = `${row.source}-${row.sourceId}-${status}`;
+    setPendingAction(pendingKey);
+    const result =
+      row.source === 'journal'
+        ? await setJournalValidation(row.sourceId, status)
+        : await setMaterialValidation(row.sourceId, status);
+    setPendingAction(null);
+
+    setMessage({
+      tone: result.success ? 'success' : 'warning',
+      text: result.success
+        ? `${row.type} atas nama ${row.actorName} telah diubah menjadi status ${status}.`
+        : result.message,
+    });
   };
 
   return (
@@ -84,7 +93,7 @@ export function KurikulumValidasiPage() {
         description="Kurikulum memvalidasi jurnal siswa dan materi guru langsung dari halaman monitoring."
       />
 
-      {message ? <InfoAlert tone="success" message={message} /> : null}
+      {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
 
       {detail ? (
         <section className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
@@ -142,16 +151,18 @@ export function KurikulumValidasiPage() {
                       <button
                         type="button"
                         onClick={() => handleValidate(row, 'Valid')}
-                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                        disabled={pendingAction !== null}
+                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
-                        Validasi
+                        {pendingAction === `${row.source}-${row.sourceId}-Valid` ? 'Menyimpan...' : 'Validasi'}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleValidate(row, 'Ditolak')}
-                        className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+                        disabled={pendingAction !== null}
+                        className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
-                        Tolak
+                        {pendingAction === `${row.source}-${row.sourceId}-Ditolak` ? 'Menyimpan...' : 'Tolak'}
                       </button>
                       <button
                         type="button"

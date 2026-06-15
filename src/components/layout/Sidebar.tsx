@@ -86,7 +86,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
 export function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <>
-      <aside className="hidden h-screen w-[304px] shrink-0 border-r border-brand-100 bg-white lg:block">
+      <aside className="hidden min-h-screen w-[304px] shrink-0 self-stretch border-r border-brand-100 bg-white lg:block">
         <SidebarContent onClose={onClose} />
       </aside>
 

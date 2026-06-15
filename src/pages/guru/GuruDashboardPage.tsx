@@ -21,11 +21,25 @@ export function GuruDashboardPage() {
   const todayAttendanceRecords = teacherAttendances.filter(
     (item) => item.teacherId === teacher.id && item.date === academicDateReference,
   );
-  const presensiStatus = todaySchedules.every((schedule) =>
+  const completedPresensiCount = todaySchedules.filter((schedule) =>
     todayAttendanceRecords.some((record) => record.scheduleId === schedule.id),
-  )
-    ? 'Lengkap'
-    : 'Belum lengkap';
+  ).length;
+  const presensiStatus =
+    todaySchedules.length === 0
+      ? 'Tidak ada'
+      : completedPresensiCount === 0
+        ? 'Belum'
+        : completedPresensiCount === todaySchedules.length
+          ? 'Selesai'
+          : `${completedPresensiCount}/${todaySchedules.length} sesi`;
+  const presensiDescription =
+    todaySchedules.length === 0
+      ? 'Tidak ada jadwal mengajar yang perlu dipresensi hari ini.'
+      : completedPresensiCount === 0
+        ? 'Belum ada presensi mengajar yang tercatat untuk jadwal hari ini.'
+        : completedPresensiCount === todaySchedules.length
+          ? 'Semua jadwal mengajar hari ini sudah tercatat presensinya.'
+          : `${completedPresensiCount} dari ${todaySchedules.length} jadwal hari ini sudah tercatat presensinya.`;
   const journalCountToday = studentJournals.filter((journal) => {
     const schedule = schedules.find((item) => item.id === journal.scheduleId);
     return schedule?.teacherId === teacher.id && journal.date === academicDateReference;
@@ -57,7 +71,7 @@ export function GuruDashboardPage() {
         <StatCard
           title="Status Presensi"
           value={presensiStatus}
-          description="Status kelengkapan presensi mengajar untuk seluruh jadwal hari ini."
+          description={presensiDescription}
           icon={ClipboardCheck}
         />
         <StatCard

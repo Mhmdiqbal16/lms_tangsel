@@ -1,0 +1,286 @@
+@startuml
+title ERD Database WEB SMKN2
+
+' Layout dibuat lebih rapat dan font diperbesar agar nyaman ditempel ke laporan Word.
+hide circle
+scale 1.25
+skinparam linetype ortho
+skinparam shadowing false
+skinparam dpi 180
+skinparam defaultFontName Arial
+skinparam defaultFontSize 18
+skinparam titleFontSize 28
+skinparam legendFontSize 16
+skinparam nodesep 18
+skinparam ranksep 24
+skinparam padding 2
+skinparam ArrowFontSize 15
+skinparam ArrowThickness 1.2
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  FontColor #111111
+  FontSize 18
+  AttributeFontSize 16
+}
+
+legend right
+  PK = Primary Key
+  FK = Foreign Key
+  UK = Unique Key
+
+  user_role = siswa, guru, kurikulum, admin
+  attendance_status = Hadir, Izin, Alfa
+  teacher_attendance_status = Hadir, Izin, Belum Presensi
+  validation_status = Menunggu, Valid, Ditolak
+  alignment_status = Sesuai, Belum Diisi, Perlu Cek
+  assessment_type = pretest, posttest
+  active_status = Aktif, Nonaktif
+endlegend
+
+entity "app_users" as app_users {
+  * id : text <<PK>>
+  --
+  * role : user_role
+  * identifier : text <<UK role_identifier>>
+  * password_hash : text
+  * name : text
+  * reference_id : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "subjects" as subjects {
+  * id : text <<PK>>
+  --
+  * name : text <<UK>>
+  * short_name : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "teachers" as teachers {
+  * id : text <<PK>>
+  --
+  user_id : text <<FK nullable>>
+  * name : text
+  * nip : text <<UK>>
+  * email : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "teacher_subjects" as teacher_subjects {
+  * teacher_id : text <<PK, FK>>
+  * subject_id : text <<PK, FK>>
+}
+
+entity "classes" as classes {
+  * id : text <<PK>>
+  --
+  * name : text <<UK>>
+  * major : text
+  homeroom_teacher_id : text <<FK nullable>>
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "students" as students {
+  * id : text <<PK>>
+  --
+  user_id : text <<FK nullable>>
+  * name : text
+  * nisn : text <<UK>>
+  * class_id : text <<FK>>
+  * email : text
+  * avatar : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "curricula" as curricula {
+  * id : text <<PK>>
+  --
+  user_id : text <<FK nullable>>
+  * name : text
+  * nip : text <<UK>>
+  * employee_id : text <<UK>>
+  * email : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "admins" as admins {
+  * id : text <<PK>>
+  --
+  user_id : text <<FK nullable>>
+  * name : text
+  * nip : text <<UK>>
+  * email : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "schedules" as schedules {
+  * id : text <<PK>>
+  --
+  * class_id : text <<FK>>
+  * subject_id : text <<FK>>
+  * teacher_id : text <<FK>>
+  * day : smallint
+  * start_time : time
+  * end_time : time
+  * room : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "teacher_attendances" as teacher_attendances {
+  * id : text <<PK>>
+  --
+  * teacher_id : text <<FK, UK teacher_schedule_date>>
+  * schedule_id : text <<FK, UK teacher_schedule_date>>
+  * date : date <<UK teacher_schedule_date>>
+  * status : teacher_attendance_status
+  * notes : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "student_attendances" as student_attendances {
+  * id : text <<PK>>
+  --
+  * student_id : text <<FK, UK student_schedule_date>>
+  * schedule_id : text <<FK, UK student_schedule_date>>
+  * date : date <<UK student_schedule_date>>
+  * status : attendance_status
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "learning_materials" as learning_materials {
+  * id : text <<PK>>
+  --
+  * teacher_id : text <<FK>>
+  * schedule_id : text <<FK, UK schedule_date>>
+  * date : date <<UK schedule_date>>
+  * meeting : integer
+  * title : text
+  * description : text
+  * validation_status : validation_status
+  * alignment_status : alignment_status
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "assessments" as assessments {
+  * id : text <<PK>>
+  --
+  * type : assessment_type <<UK type_schedule_date_meeting>>
+  * teacher_id : text <<FK>>
+  * schedule_id : text <<FK, UK type_schedule_date_meeting>>
+  * class_id : text <<FK>>
+  * subject_id : text <<FK>>
+  * date : date <<UK type_schedule_date_meeting>>
+  * meeting : integer <<UK type_schedule_date_meeting>>
+  * question_count : integer
+  * status : active_status
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "assessment_questions" as assessment_questions {
+  * id : text <<PK>>
+  --
+  * assessment_id : text <<FK>>
+  * question : text
+  * options : jsonb
+  * answer : text
+  * position : integer
+  * created_at : timestamptz
+}
+
+entity "assessment_student_statuses" as assessment_student_statuses {
+  * assessment_id : text <<PK, FK>>
+  * student_id : text <<PK, FK>>
+  --
+  * completed : boolean
+  completed_at : timestamptz
+}
+
+entity "teacher_questionnaires" as teacher_questionnaires {
+  * id : text <<PK>>
+  --
+  * student_id : text <<FK, UK student_teacher_schedule_date>>
+  * teacher_id : text <<FK, UK student_teacher_schedule_date>>
+  * schedule_id : text <<FK, UK student_teacher_schedule_date>>
+  * date : date <<UK student_teacher_schedule_date>>
+  * completed : boolean
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+entity "student_journals" as student_journals {
+  * id : text <<PK>>
+  --
+  * student_id : text <<FK, UK student_schedule_date>>
+  * schedule_id : text <<FK, UK student_schedule_date>>
+  * date : date <<UK student_schedule_date>>
+  * material_studied : text
+  * summary : text
+  * tasks : text
+  * learning_obstacles : text
+  attachment_name : text
+  attachment_path : text
+  attachment_size : bigint
+  attachment_type : text
+  * entry_status : text
+  * review_status : text
+  * notes : text
+  * validation_status : validation_status
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
+' Optional profile links: user_id uses ON DELETE SET NULL.
+app_users |o--o{ teachers : user_id
+app_users |o--o{ students : user_id
+app_users |o--o{ curricula : user_id
+app_users |o--o{ admins : user_id
+
+' Master data relationships.
+teachers ||--o{ teacher_subjects : teacher_id
+subjects ||--o{ teacher_subjects : subject_id
+teachers |o--o{ classes : homeroom_teacher_id
+classes ||--o{ students : class_id
+
+' Schedule relationships.
+classes ||--o{ schedules : class_id
+subjects ||--o{ schedules : subject_id
+teachers ||--o{ schedules : teacher_id
+
+' Attendance and learning activity relationships.
+teachers ||--o{ teacher_attendances : teacher_id
+schedules ||--o{ teacher_attendances : schedule_id
+students ||--o{ student_attendances : student_id
+schedules ||--o{ student_attendances : schedule_id
+teachers ||--o{ learning_materials : teacher_id
+schedules ||--o{ learning_materials : schedule_id
+
+' Assessment relationships.
+teachers ||--o{ assessments : teacher_id
+schedules ||--o{ assessments : schedule_id
+classes ||--o{ assessments : class_id
+subjects ||--o{ assessments : subject_id
+assessments ||--o{ assessment_questions : assessment_id
+assessments ||--o{ assessment_student_statuses : assessment_id
+students ||--o{ assessment_student_statuses : student_id
+
+' Student feedback and journal relationships.
+students ||--o{ teacher_questionnaires : student_id
+teachers ||--o{ teacher_questionnaires : teacher_id
+schedules ||--o{ teacher_questionnaires : schedule_id
+students ||--o{ student_journals : student_id
+schedules ||--o{ student_journals : schedule_id
+
+@enduml

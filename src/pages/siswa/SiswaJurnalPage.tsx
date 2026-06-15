@@ -1,12 +1,10 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { academicDateReference } from '@/data/mockData';
-import { useAppData } from '@/hooks/useAppData';
-import { useAuth } from '@/hooks/useAuth';
-import { getJournalEligibility } from '@/utils/businessRules';
-import { formatDateID, formatDayName, getRecentSchoolDates, parseISODate, toISODate } from '@/utils/date';
+import { formatDateID, formatDayName } from '@/utils/date';
+import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
 
 const statusVariantMap = {
   Selesai: 'green',
@@ -22,24 +20,14 @@ interface JournalFormState {
   attachmentName: string;
 }
 
+function getSessionUrl(path: string, scheduleId: string, date: string) {
+  return `${path}?scheduleId=${encodeURIComponent(scheduleId)}&date=${encodeURIComponent(date)}`;
+}
+
 export function SiswaJurnalPage() {
-  const { session } = useAuth();
-  const {
-    students,
-    schedules,
-    subjects,
-    teachers,
-    learningMaterials,
-    studentJournals,
-    assessments,
-    questionnaires,
-    addStudentJournal,
-    completeAssessment,
-    completeQuestionnaire,
-  } = useAppData();
-  const student = students.find((item) => item.id === session?.referenceId);
-  const recentDates = getRecentSchoolDates(3, parseISODate(academicDateReference));
-  const [selectedKey, setSelectedKey] = useState('');
+  const { student, sessions, assessments, addStudentJournal } = useStudentLearningSessions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
   const [form, setForm] = useState<JournalFormState>({
     materialStudied: '',
@@ -49,52 +37,17 @@ export function SiswaJurnalPage() {
     attachmentName: '',
   });
 
-  const sessions =
-    recentDates.flatMap((date) =>
-      schedules
-        .filter((item) => item.classId === student?.classId && item.day === date.getDay())
-        .sort((first, second) => first.startTime.localeCompare(second.startTime))
-        .map((schedule) => {
-          const sessionDate = toISODate(date);
-          const subject = subjects.find((item) => item.id === schedule.subjectId);
-          const teacher = teachers.find((item) => item.id === schedule.teacherId);
-          const material = learningMaterials.find(
-            (item) => item.scheduleId === schedule.id && item.date === sessionDate,
-          );
-          const journal = studentJournals.find(
-            (item) => item.studentId === student?.id && item.scheduleId === schedule.id && item.date === sessionDate,
-          );
-          const eligibility = getJournalEligibility({
-            studentId: student?.id ?? '',
-            scheduleId: schedule.id,
-            sessionDate,
-            journals: studentJournals,
-            assessments,
-            questionnaires,
-            currentDate: academicDateReference,
-          });
-
-          return {
-            key: `${schedule.id}-${sessionDate}`,
-            schedule,
-            sessionDate,
-            subject,
-            teacher,
-            material,
-            journal,
-            eligibility,
-          };
-        }),
-    ) ?? [];
-
-  const selectedSession = sessions.find((item) => item.key === selectedKey) ?? sessions[0];
+  const requestedKey =
+    searchParams.get('scheduleId') && searchParams.get('date')
+      ? `${searchParams.get('scheduleId')}-${searchParams.get('date')}`
+      : '';
+  const selectedSession = sessions.find((item) => item.key === requestedKey) ?? sessions[0];
 
   useEffect(() => {
     if (!selectedSession) {
       return;
     }
 
-    setSelectedKey(selectedSession.key);
     setForm({
       materialStudied: selectedSession.material?.title ?? '',
       summary: '',
@@ -102,7 +55,7 @@ export function SiswaJurnalPage() {
       learningObstacles: '',
       attachmentName: '',
     });
-  }, [selectedSession?.key]);
+  }, [selectedSession?.key, selectedSession?.material?.title]);
 
   if (!student || !selectedSession) {
     return (
@@ -115,9 +68,28 @@ export function SiswaJurnalPage() {
     );
   }
 
-  const isLocked = selectedSession.eligibility.locked;
-  const isDuplicate = selectedSession.eligibility.duplicate;
-  const relatedTeacherId = selectedSession.schedule.teacherId;
+  const isFormDisabled = !selectedSession.eligibility.canSubmit || isSaving;
+  const pretestAssessment = selectedSession.eligibility.pretestAssessmentId
+    ? assessments.find((assessment) => assessment.id === selectedSession.eligibility.pretestAssessmentId)
+    : undefined;
+  const posttestAssessment = selectedSession.eligibility.posttestAssessmentId
+    ? assessments.find((assessment) => assessment.id === selectedSession.eligibility.posttestAssessmentId)
+    : undefined;
+  const pretestUrl = getSessionUrl('/siswa/pretest', selectedSession.schedule.id, selectedSession.sessionDate);
+  const posttestUrl = getSessionUrl('/siswa/posttest', selectedSession.schedule.id, selectedSession.sessionDate);
+  const questionnaireUrl = getSessionUrl('/siswa/kuisioner', selectedSession.schedule.id, selectedSession.sessionDate);
+
+  const handleSelectSession = (key: string) => {
+    const session = sessions.find((item) => item.key === key);
+    if (!session) {
+      return;
+    }
+
+    setSearchParams({
+      scheduleId: session.schedule.id,
+      date: session.sessionDate,
+    });
+  };
 
   const handleChange = (field: keyof JournalFormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -128,7 +100,7 @@ export function SiswaJurnalPage() {
     handleChange('attachmentName', file?.name ?? '');
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedSession.eligibility.canSubmit) {
@@ -141,7 +113,8 @@ export function SiswaJurnalPage() {
       return;
     }
 
-    const result = addStudentJournal({
+    setIsSaving(true);
+    const result = await addStudentJournal({
       studentId: student.id,
       scheduleId: selectedSession.schedule.id,
       date: selectedSession.sessionDate,
@@ -151,6 +124,7 @@ export function SiswaJurnalPage() {
       learningObstacles: form.learningObstacles,
       attachmentName: form.attachmentName || 'lampiran-dummy.pdf',
     });
+    setIsSaving(false);
 
     setMessage({ tone: result.success ? 'success' : 'warning', text: result.message });
   };
@@ -159,7 +133,7 @@ export function SiswaJurnalPage() {
     <div className="space-y-6">
       <PageHeader
         title="Isi Jurnal"
-        description="Siswa hanya dapat mengisi jurnal untuk pelajaran yang sesuai jadwal, masih dalam batas H+1, dan sudah menuntaskan pretest, posttest, serta kuisioner guru."
+        description="Selesaikan pretest, kirim jurnal, lalu lanjutkan posttest dan kuisioner di halaman masing-masing."
       />
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
@@ -170,7 +144,7 @@ export function SiswaJurnalPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Daftar Pelajaran Aktif & H+1</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Status menampilkan sesi yang sudah selesai, belum siap, atau terkunci.
+                Pilih sesi pelajaran yang akan dilengkapi syarat dan jurnalnya.
               </p>
             </div>
             <Badge variant="blue">Batas H+1 aktif</Badge>
@@ -181,7 +155,7 @@ export function SiswaJurnalPage() {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setSelectedKey(item.key)}
+                onClick={() => handleSelectSession(item.key)}
                 className={`w-full rounded-3xl border p-5 text-left transition ${
                   selectedSession.key === item.key
                     ? 'border-brand-600 bg-brand-50 shadow-soft'
@@ -212,7 +186,7 @@ export function SiswaJurnalPage() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Status Syarat Pengisian</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Pastikan seluruh syarat selesai sebelum jurnal disimpan.
+                  Alur dibuat bertahap agar siswa mengerjakan dari pretest, jurnal, lalu posttest dan kuisioner.
                 </p>
               </div>
               <Badge variant={statusVariantMap[selectedSession.eligibility.status]}>{selectedSession.eligibility.status}</Badge>
@@ -224,16 +198,13 @@ export function SiswaJurnalPage() {
                 <p className="mt-2 text-base font-semibold text-slate-900">
                   {selectedSession.eligibility.pretestDone ? 'Selesai' : 'Belum'}
                 </p>
-                {!selectedSession.eligibility.pretestDone && !isLocked && selectedSession.eligibility.pretestAssessmentId ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      completeAssessment(selectedSession.eligibility.pretestAssessmentId!, student.id)
-                    }
-                    className="mt-4 rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                {!selectedSession.eligibility.pretestDone ? (
+                  <Link
+                    to={pretestUrl}
+                    className="mt-4 inline-flex rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Simulasikan selesai
-                  </button>
+                    {pretestAssessment ? 'Kerjakan Pretest' : 'Cek Pretest'}
+                  </Link>
                 ) : null}
               </div>
 
@@ -242,16 +213,18 @@ export function SiswaJurnalPage() {
                 <p className="mt-2 text-base font-semibold text-slate-900">
                   {selectedSession.eligibility.posttestDone ? 'Selesai' : 'Belum'}
                 </p>
-                {!selectedSession.eligibility.posttestDone && !isLocked && selectedSession.eligibility.posttestAssessmentId ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      completeAssessment(selectedSession.eligibility.posttestAssessmentId!, student.id)
-                    }
-                    className="mt-4 rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                {!selectedSession.eligibility.posttestDone && selectedSession.journal ? (
+                  <Link
+                    to={posttestUrl}
+                    className="mt-4 inline-flex rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Simulasikan selesai
-                  </button>
+                    {posttestAssessment ? 'Kerjakan Posttest' : 'Cek Posttest'}
+                  </Link>
+                ) : null}
+                {!selectedSession.eligibility.posttestDone && !selectedSession.journal ? (
+                  <p className="mt-4 text-sm leading-6 text-slate-500">
+                    Kirim jurnal terlebih dahulu untuk membuka posttest.
+                  </p>
                 ) : null}
               </div>
 
@@ -260,21 +233,18 @@ export function SiswaJurnalPage() {
                 <p className="mt-2 text-base font-semibold text-slate-900">
                   {selectedSession.eligibility.questionnaireDone ? 'Sudah diisi' : 'Belum'}
                 </p>
-                {!selectedSession.eligibility.questionnaireDone && !isLocked ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      completeQuestionnaire({
-                        studentId: student.id,
-                        teacherId: relatedTeacherId,
-                        scheduleId: selectedSession.schedule.id,
-                        date: selectedSession.sessionDate,
-                      })
-                    }
-                    className="mt-4 rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                {!selectedSession.eligibility.questionnaireDone && selectedSession.journal ? (
+                  <Link
+                    to={questionnaireUrl}
+                    className="mt-4 inline-flex rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Simulasikan isi kuisioner
-                  </button>
+                    Isi Kuisioner
+                  </Link>
+                ) : null}
+                {!selectedSession.eligibility.questionnaireDone && !selectedSession.journal ? (
+                  <p className="mt-4 text-sm leading-6 text-slate-500">
+                    Kirim jurnal terlebih dahulu untuk membuka kuisioner.
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -285,7 +255,7 @@ export function SiswaJurnalPage() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Form Jurnal</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Form aktif hanya jika syarat jurnal terpenuhi dan belum ada data duplikat.
+                  Form aktif setelah pretest selesai.
                 </p>
               </div>
               <Badge variant="blue">{formatDateID(selectedSession.sessionDate)}</Badge>
@@ -324,7 +294,7 @@ export function SiswaJurnalPage() {
                 <input
                   value={form.materialStudied}
                   onChange={(event) => handleChange('materialStudied', event.target.value)}
-                  disabled={isLocked || isDuplicate}
+                  disabled={isFormDisabled}
                   className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-50"
                   placeholder="Contoh: Normalisasi 1NF sampai 3NF"
                 />
@@ -335,7 +305,7 @@ export function SiswaJurnalPage() {
                 <textarea
                   value={form.summary}
                   onChange={(event) => handleChange('summary', event.target.value)}
-                  disabled={isLocked || isDuplicate}
+                  disabled={isFormDisabled}
                   rows={4}
                   className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-50"
                   placeholder="Tuliskan inti materi yang dipahami dari pembelajaran hari ini."
@@ -348,7 +318,7 @@ export function SiswaJurnalPage() {
                   <textarea
                     value={form.tasks}
                     onChange={(event) => handleChange('tasks', event.target.value)}
-                    disabled={isLocked || isDuplicate}
+                    disabled={isFormDisabled}
                     rows={4}
                     className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-50"
                     placeholder="Tuliskan tugas atau latihan yang diberikan guru."
@@ -359,7 +329,7 @@ export function SiswaJurnalPage() {
                   <textarea
                     value={form.learningObstacles}
                     onChange={(event) => handleChange('learningObstacles', event.target.value)}
-                    disabled={isLocked || isDuplicate}
+                    disabled={isFormDisabled}
                     rows={4}
                     className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-50"
                     placeholder="Tuliskan kendala atau catatan refleksi belajar."
@@ -372,7 +342,7 @@ export function SiswaJurnalPage() {
                 <input
                   type="file"
                   onChange={handleFileChange}
-                  disabled={isLocked || isDuplicate}
+                  disabled={isFormDisabled}
                   className="w-full rounded-2xl border border-dashed border-brand-200 bg-brand-50/50 px-4 py-3 text-sm outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-brand-600 file:px-4 file:py-2 file:font-semibold file:text-white disabled:cursor-not-allowed disabled:bg-slate-50"
                 />
                 {form.attachmentName ? <p className="text-sm text-slate-500">Lampiran terpilih: {form.attachmentName}</p> : null}
@@ -389,10 +359,10 @@ export function SiswaJurnalPage() {
 
               <button
                 type="submit"
-                disabled={!selectedSession.eligibility.canSubmit}
+                disabled={!selectedSession.eligibility.canSubmit || isSaving}
                 className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                Simpan Jurnal
+                {isSaving ? 'Menyimpan...' : 'Simpan Jurnal'}
               </button>
             </form>
           </section>

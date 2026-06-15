@@ -46,6 +46,7 @@ export function GuruTestPage() {
     pretest: 0,
     posttest: 0,
   });
+  const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
 
   if (!teacher) {
@@ -197,7 +198,7 @@ export function GuruTestPage() {
       answer: question.options[question.answerIndex] ?? '',
     }));
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedSchedule) {
@@ -205,7 +206,8 @@ export function GuruTestPage() {
       return;
     }
 
-    const result = addAssessmentBundle({
+    setIsSaving(true);
+    const result = await addAssessmentBundle({
       teacherId: teacher.id,
       scheduleId: selectedSchedule.id,
       date: academicDateReference,
@@ -216,6 +218,7 @@ export function GuruTestPage() {
       pretestQuestions: toQuestionPayload(pretestQuestions),
       posttestQuestions: toQuestionPayload(posttestQuestions),
     });
+    setIsSaving(false);
 
     setMessage({ tone: result.success ? 'success' : 'warning', text: result.message });
 
@@ -448,9 +451,10 @@ export function GuruTestPage() {
 
             <button
               type="submit"
-              className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700"
+              disabled={isSaving}
+              className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Buat Paket Test
+              {isSaving ? 'Menyimpan...' : 'Buat Paket Test'}
             </button>
           </form>
         </section>

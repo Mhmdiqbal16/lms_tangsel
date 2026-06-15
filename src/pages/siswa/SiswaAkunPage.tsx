@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/Badge';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useAppData } from '@/hooks/useAppData';
@@ -81,43 +80,43 @@ export function SiswaAkunPage() {
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
 
-      <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-        <div className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
-          <div className="flex flex-col items-center text-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-brand-600 text-3xl font-bold text-white">
+      <section className="min-w-0 rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
+        <div className="space-y-6">
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[24px] bg-brand-600 text-2xl font-bold text-white sm:h-24 sm:w-24 sm:text-3xl">
               {student.avatar}
             </div>
-            <h2 className="mt-5 text-2xl font-bold text-slate-900">{student.name}</h2>
-            <p className="mt-1 text-sm text-slate-500">Siswa aktif pada Sistem Monitoring Pembelajaran</p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Badge variant="blue">{classInfo?.name}</Badge>
-              <Badge variant="green">NISN {student.nisn}</Badge>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-500">Detail Akun</p>
+              <h2 className="mt-2 break-words text-2xl font-bold text-slate-900 [overflow-wrap:anywhere]">
+                {student.name}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">Siswa aktif pada Sistem Monitoring Pembelajaran</p>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
-          <h2 className="text-xl font-bold text-slate-900">Detail Akun</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl bg-brand-50/60 p-4">
-              <p className="text-sm font-medium text-slate-500">Nama</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{student.name}</p>
-            </div>
-            <div className="rounded-2xl bg-brand-50/60 p-4">
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
+            <div className="min-w-0 rounded-2xl bg-brand-50/60 p-4">
               <p className="text-sm font-medium text-slate-500">NISN</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{student.nisn}</p>
+              <p className="mt-2 break-words text-lg font-semibold text-slate-900 [overflow-wrap:anywhere]">
+                {student.nisn}
+              </p>
             </div>
-            <div className="rounded-2xl bg-brand-50/60 p-4">
+            <div className="min-w-0 rounded-2xl bg-brand-50/60 p-4">
               <p className="text-sm font-medium text-slate-500">Kelas</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{classInfo?.name}</p>
+              <p className="mt-2 break-words text-lg font-semibold text-slate-900 [overflow-wrap:anywhere]">
+                {classInfo?.name}
+              </p>
             </div>
-            <div className="rounded-2xl bg-brand-50/60 p-4">
+            <div className="min-w-0 rounded-2xl bg-brand-50/60 p-4">
               <p className="text-sm font-medium text-slate-500">Email</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{student.email}</p>
+              <p className="mt-2 break-words text-lg font-semibold text-slate-900 [overflow-wrap:anywhere]">
+                {student.email}
+              </p>
             </div>
           </div>
 
-          <form className="mt-6 space-y-4" onSubmit={handleProfileSubmit}>
+          <form className="space-y-4 border-t border-brand-100 pt-6" onSubmit={handleProfileSubmit}>
             <h3 className="text-lg font-bold text-slate-900">Edit Profil</h3>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
@@ -155,7 +154,7 @@ export function SiswaAkunPage() {
             </button>
           </form>
 
-          <form className="mt-8 space-y-4 border-t border-brand-100 pt-6" onSubmit={handlePasswordSubmit}>
+          <form className="space-y-4 border-t border-brand-100 pt-6" onSubmit={handlePasswordSubmit}>
             <h3 className="text-lg font-bold text-slate-900">Ubah Password</h3>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="space-y-2 text-sm font-medium text-slate-700">

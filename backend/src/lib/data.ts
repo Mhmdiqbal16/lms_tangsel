@@ -1,14 +1,17 @@
 import type {
   Admin,
+  AssessmentRecord,
   ClassRoom,
   Curriculum,
   LearningMaterial,
   Schedule,
   Student,
   StudentAttendance,
+  StudentJournal,
   Subject,
   Teacher,
   TeacherAttendance,
+  TeacherQuestionnaire,
   User,
 } from '@/types/domain';
 
@@ -371,6 +374,12 @@ export const teacherAttendances: TeacherAttendance[] = [];
 export const studentAttendances: StudentAttendance[] = [];
 
 export const learningMaterials: LearningMaterial[] = [];
+
+export const assessments: AssessmentRecord[] = [];
+
+export const questionnaires: TeacherQuestionnaire[] = [];
+
+export const studentJournals: StudentJournal[] = [];
 
 export function getUserProfile(user: User) {
   if (user.role === 'siswa') {

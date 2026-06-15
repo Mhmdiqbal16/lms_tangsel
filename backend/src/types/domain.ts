@@ -8,6 +8,10 @@ export type ValidationStatus = 'Menunggu' | 'Valid' | 'Ditolak';
 
 export type AlignmentStatus = 'Sesuai' | 'Belum Diisi' | 'Perlu Cek';
 
+export type AssessmentType = 'pretest' | 'posttest';
+
+export type ActiveStatus = 'Aktif' | 'Nonaktif';
+
 export type User = {
   id: string;
   role: UserRole;
@@ -104,4 +108,54 @@ export type LearningMaterial = {
   description: string;
   validationStatus: ValidationStatus;
   alignmentStatus: AlignmentStatus;
+};
+
+export type AssessmentQuestion = {
+  id: string;
+  question: string;
+  options: string[];
+  answer: string;
+};
+
+export type AssessmentRecord = {
+  id: string;
+  type: AssessmentType;
+  teacherId: string;
+  scheduleId: string;
+  classId: string;
+  subjectId: string;
+  date: string;
+  meeting: number;
+  questionCount: number;
+  status: ActiveStatus;
+  questions: AssessmentQuestion[];
+  studentStatuses: Array<{
+    studentId: string;
+    completed: boolean;
+  }>;
+};
+
+export type TeacherQuestionnaire = {
+  id: string;
+  studentId: string;
+  teacherId: string;
+  scheduleId: string;
+  date: string;
+  completed: boolean;
+};
+
+export type StudentJournal = {
+  id: string;
+  studentId: string;
+  scheduleId: string;
+  date: string;
+  materialStudied: string;
+  summary: string;
+  tasks: string;
+  learningObstacles: string;
+  attachmentName: string;
+  entryStatus: 'Selesai';
+  reviewStatus: 'Belum Ditinjau' | 'Menunggu Review' | 'Tervalidasi' | 'Perlu Revisi';
+  notes: string;
+  validationStatus: ValidationStatus;
 };

@@ -1,12 +1,15 @@
 import type { NextRequest } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import {
+  listAssessments,
   listClasses,
   listLearningMaterials,
   listSchedules,
   listStudentAttendances,
+  listStudentJournals,
   listStudents,
   listSubjects,
+  listTeacherQuestionnaires,
   listTeacherAttendances,
   listTeachers,
 } from '@/lib/repository';
@@ -28,6 +31,9 @@ export async function GET(request: NextRequest) {
     studentAttendances,
     teacherAttendances,
     learningMaterials,
+    assessments,
+    questionnaires,
+    studentJournals,
   ] = await Promise.all([
     listStudents(),
     listTeachers(),
@@ -37,6 +43,9 @@ export async function GET(request: NextRequest) {
     listStudentAttendances(),
     listTeacherAttendances(),
     listLearningMaterials(),
+    listAssessments(),
+    listTeacherQuestionnaires(),
+    listStudentJournals(),
   ]);
 
   return ok({
@@ -51,8 +60,8 @@ export async function GET(request: NextRequest) {
     studentAttendances,
     teacherAttendances,
     learningMaterials,
-    assessments: [],
-    questionnaires: [],
-    studentJournals: [],
+    assessments,
+    questionnaires,
+    studentJournals,
   });
 }
