@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useAppData } from '@/hooks/useAppData';
@@ -18,6 +19,11 @@ type ValidationRow = {
   subject: string;
 };
 
+type ValidationConfirmation = {
+  row: ValidationRow;
+  status: 'Valid' | 'Ditolak';
+};
+
 export function KurikulumValidasiPage() {
   const {
     studentJournals,
@@ -32,6 +38,7 @@ export function KurikulumValidasiPage() {
   } = useAppData();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [validationConfirmation, setValidationConfirmation] = useState<ValidationConfirmation | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   const rows: ValidationRow[] = [
@@ -69,7 +76,11 @@ export function KurikulumValidasiPage() {
 
   const detail = rows.find((item) => item.id === detailId) ?? rows[0];
 
-  const handleValidate = async (row: ValidationRow, status: 'Valid' | 'Ditolak') => {
+  const requestValidate = (row: ValidationRow, status: 'Valid' | 'Ditolak') => {
+    setValidationConfirmation({ row, status });
+  };
+
+  const executeValidate = async (row: ValidationRow, status: 'Valid' | 'Ditolak') => {
     const pendingKey = `${row.source}-${row.sourceId}-${status}`;
     setPendingAction(pendingKey);
     const result =
@@ -84,7 +95,21 @@ export function KurikulumValidasiPage() {
         ? `${row.type} atas nama ${row.actorName} telah diubah menjadi status ${status}.`
         : result.message,
     });
+    setValidationConfirmation(null);
   };
+
+  const handleConfirmValidation = () => {
+    if (!validationConfirmation) {
+      return;
+    }
+
+    void executeValidate(validationConfirmation.row, validationConfirmation.status);
+  };
+
+  const validationConfirmationLoading = validationConfirmation
+    ? pendingAction ===
+      `${validationConfirmation.row.source}-${validationConfirmation.row.sourceId}-${validationConfirmation.status}`
+    : false;
 
   return (
     <div className="space-y-6">
@@ -150,7 +175,7 @@ export function KurikulumValidasiPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => handleValidate(row, 'Valid')}
+                        onClick={() => requestValidate(row, 'Valid')}
                         disabled={pendingAction !== null}
                         className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
@@ -158,7 +183,7 @@ export function KurikulumValidasiPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleValidate(row, 'Ditolak')}
+                        onClick={() => requestValidate(row, 'Ditolak')}
                         disabled={pendingAction !== null}
                         className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
@@ -179,6 +204,25 @@ export function KurikulumValidasiPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(validationConfirmation)}
+        title={
+          validationConfirmation?.status === 'Valid'
+            ? `Validasi ${validationConfirmation.row.type}?`
+            : `Tolak ${validationConfirmation?.row.type ?? 'data'}?`
+        }
+        description={
+          validationConfirmation
+            ? `${validationConfirmation.row.type} atas nama ${validationConfirmation.row.actorName} akan diubah menjadi status ${validationConfirmation.status}.`
+            : 'Status data akan diperbarui.'
+        }
+        tone={validationConfirmation?.status === 'Ditolak' ? 'danger' : 'success'}
+        confirmLabel={validationConfirmationLoading ? 'Menyimpan...' : 'Konfirmasi'}
+        isLoading={validationConfirmationLoading}
+        onConfirm={handleConfirmValidation}
+        onCancel={() => setValidationConfirmation(null)}
+      />
     </div>
   );
 }

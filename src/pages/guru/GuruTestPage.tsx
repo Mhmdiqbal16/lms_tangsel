@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { academicDateReference } from '@/data/mockData';
@@ -18,6 +19,9 @@ interface QuestionDraft {
 }
 
 type QuestionSection = 'pretest' | 'posttest';
+type TestConfirmation =
+  | { type: 'remove-question'; section: QuestionSection; index: number }
+  | { type: 'copy-pretest' };
 
 function createEmptyQuestion(): QuestionDraft {
   return {
@@ -46,6 +50,7 @@ export function GuruTestPage() {
     pretest: 0,
     posttest: 0,
   });
+  const [testConfirmation, setTestConfirmation] = useState<TestConfirmation | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
 
@@ -164,12 +169,18 @@ export function GuruTestPage() {
     setActiveQuestionIndexes((current) => ({ ...current, [section]: questions.length }));
   };
 
-  const removeQuestion = (section: QuestionSection, index: number) => {
+  const requestRemoveQuestion = (section: QuestionSection, index: number) => {
     const questions = getQuestions(section);
 
     if (questions.length === 1) {
       return;
     }
+
+    setTestConfirmation({ type: 'remove-question', section, index });
+  };
+
+  const executeRemoveQuestion = (section: QuestionSection, index: number) => {
+    const questions = getQuestions(section);
 
     getQuestionSetter(section)((current) => current.filter((_, itemIndex) => itemIndex !== index));
     setActiveQuestionIndexes((current) => {
@@ -184,11 +195,29 @@ export function GuruTestPage() {
     });
   };
 
-  const copyPretestToPosttest = () => {
+  const requestCopyPretestToPosttest = () => {
+    setTestConfirmation({ type: 'copy-pretest' });
+  };
+
+  const executeCopyPretestToPosttest = () => {
     setPosttestQuestions(pretestQuestions.map((question) => ({ ...question, options: [...question.options] })));
     setActiveSection('posttest');
     setActiveQuestionIndexes((current) => ({ ...current, posttest: 0 }));
     setMessage({ tone: 'info', text: 'Soal pretest disalin ke posttest. Silakan sesuaikan jika diperlukan.' });
+  };
+
+  const handleConfirmTestAction = () => {
+    if (!testConfirmation) {
+      return;
+    }
+
+    if (testConfirmation.type === 'remove-question') {
+      executeRemoveQuestion(testConfirmation.section, testConfirmation.index);
+    } else {
+      executeCopyPretestToPosttest();
+    }
+
+    setTestConfirmation(null);
   };
 
   const toQuestionPayload = (questions: QuestionDraft[]) =>
@@ -293,7 +322,7 @@ export function GuruTestPage() {
               </button>
               <button
                 type="button"
-                onClick={() => removeQuestion(section, activeIndex)}
+                onClick={() => requestRemoveQuestion(section, activeIndex)}
                 disabled={questions.length === 1}
                 className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
@@ -436,7 +465,7 @@ export function GuruTestPage() {
 
                 <button
                   type="button"
-                  onClick={copyPretestToPosttest}
+                  onClick={requestCopyPretestToPosttest}
                   className="inline-flex items-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                 >
                   <Copy className="h-4 w-4" />
@@ -507,6 +536,22 @@ export function GuruTestPage() {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(testConfirmation)}
+        title={testConfirmation?.type === 'copy-pretest' ? 'Salin pretest ke posttest?' : 'Hapus soal?'}
+        description={
+          testConfirmation?.type === 'copy-pretest'
+            ? 'Semua soal posttest saat ini akan diganti dengan salinan soal pretest.'
+            : testConfirmation
+              ? `Soal ${testConfirmation.index + 1} pada ${testConfirmation.section === 'pretest' ? 'Pretest' : 'Posttest'} akan dihapus dari draft.`
+              : 'Aksi ini akan mengubah draft soal.'
+        }
+        tone={testConfirmation?.type === 'copy-pretest' ? 'warning' : 'danger'}
+        confirmLabel={testConfirmation?.type === 'copy-pretest' ? 'Salin' : 'Hapus'}
+        onConfirm={handleConfirmTestAction}
+        onCancel={() => setTestConfirmation(null)}
+      />
     </div>
   );
 }

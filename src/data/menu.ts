@@ -29,9 +29,6 @@ export const menusByRole: Record<Role, MenuItem[]> = {
     { label: 'Dashboard', path: '/siswa/dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
     { label: 'Absensi', path: '/siswa/absensi', icon: ClipboardCheck, permission: 'student.attendance.view' },
     { label: 'Jadwal Pelajaran', path: '/siswa/jadwal', icon: CalendarClock, permission: 'schedule.view' },
-    { label: 'Pretest', path: '/siswa/pretest', icon: BookOpenCheck, permission: 'student.journal.create' },
-    { label: 'Posttest', path: '/siswa/posttest', icon: BookOpenCheck, permission: 'student.journal.create' },
-    { label: 'Kuisioner Guru', path: '/siswa/kuisioner', icon: FileCheck2, permission: 'student.journal.create' },
     { label: 'Isi Jurnal', path: '/siswa/jurnal', icon: NotebookPen, permission: 'student.journal.create' },
     {
       label: 'Riwayat Jurnal',

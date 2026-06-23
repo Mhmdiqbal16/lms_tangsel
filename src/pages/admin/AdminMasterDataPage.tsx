@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -14,8 +15,17 @@ type AdminTab = 'accounts' | 'teachers' | 'classes' | 'subjects' | 'schedules';
 type MasterDataKind = 'teacher' | 'class' | 'subject' | 'schedule';
 type AccountRecord = Omit<User, 'password'>;
 type AccountRoleFilter = Role | 'all';
+type DeleteConfirmation =
+  | { type: 'account'; account: AccountRecord }
+  | { type: 'master-data'; kind: MasterDataKind; id: string; label: string; name: string };
 
 const roleOptions: Role[] = ['siswa', 'guru', 'kurikulum', 'admin'];
+const masterDataKindLabels: Record<MasterDataKind, string> = {
+  teacher: 'guru',
+  class: 'kelas',
+  subject: 'mapel',
+  schedule: 'jadwal',
+};
 
 const emptyAccountForm = {
   role: 'siswa' as Role,
@@ -93,6 +103,8 @@ export function AdminMasterDataPage() {
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
   const [isAccountSubmitting, setIsAccountSubmitting] = useState(false);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+  const [deletingMasterDataKey, setDeletingMasterDataKey] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
   const [isReferencesLoading, setIsReferencesLoading] = useState(false);
   const [isTeacherSubmitting, setIsTeacherSubmitting] = useState(false);
   const [isClassSubmitting, setIsClassSubmitting] = useState(false);
@@ -151,7 +163,20 @@ export function AdminMasterDataPage() {
     { id: 'schedules', label: 'Jadwal', count: databaseSchedules.length },
   ];
 
-  const handleDelete = async (kind: MasterDataKind, id: string) => {
+  const requestMasterDataDelete = (kind: MasterDataKind, id: string, name: string) => {
+    setDeleteConfirmation({
+      type: 'master-data',
+      kind,
+      id,
+      label: masterDataKindLabels[kind],
+      name,
+    });
+  };
+
+  const executeMasterDataDelete = async (kind: MasterDataKind, id: string) => {
+    const deleteKey = `${kind}-${id}`;
+    setDeletingMasterDataKey(deleteKey);
+
     try {
       await apiRequest('/api/admin/master-data', {
         method: 'DELETE',
@@ -174,6 +199,9 @@ export function AdminMasterDataPage() {
         tone: 'warning',
         text: error instanceof Error ? error.message : 'Data gagal dihapus.',
       });
+    } finally {
+      setDeletingMasterDataKey(null);
+      setDeleteConfirmation(null);
     }
   };
 
@@ -332,14 +360,10 @@ export function AdminMasterDataPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Hapus akun ${account.name}? Akun ini tidak bisa digunakan login lagi, tetapi data profil tetap disimpan.`,
-    );
+    setDeleteConfirmation({ type: 'account', account });
+  };
 
-    if (!confirmed) {
-      return;
-    }
-
+  const executeDeleteAccount = async (account: AccountRecord) => {
     setDeletingAccountId(account.id);
 
     try {
@@ -362,8 +386,43 @@ export function AdminMasterDataPage() {
       });
     } finally {
       setDeletingAccountId(null);
+      setDeleteConfirmation(null);
     }
   };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmation) {
+      return;
+    }
+
+    if (deleteConfirmation.type === 'account') {
+      void executeDeleteAccount(deleteConfirmation.account);
+      return;
+    }
+
+    void executeMasterDataDelete(deleteConfirmation.kind, deleteConfirmation.id);
+  };
+
+  const isDeleteConfirmationLoading =
+    deleteConfirmation?.type === 'account'
+      ? deletingAccountId === deleteConfirmation.account.id
+      : deleteConfirmation?.type === 'master-data'
+        ? deletingMasterDataKey === `${deleteConfirmation.kind}-${deleteConfirmation.id}`
+        : false;
+
+  const deleteConfirmationTitle =
+    deleteConfirmation?.type === 'account'
+      ? `Hapus akun ${deleteConfirmation.account.name}?`
+      : deleteConfirmation
+        ? `Hapus data ${deleteConfirmation.label}?`
+        : 'Hapus data?';
+
+  const deleteConfirmationDescription =
+    deleteConfirmation?.type === 'account'
+      ? 'Akun ini tidak bisa digunakan login lagi, tetapi data profil terkait tetap disimpan.'
+      : deleteConfirmation
+        ? `Data ${deleteConfirmation.label} "${deleteConfirmation.name}" akan dihapus dari database jika tidak sedang dipakai data lain.`
+        : 'Data akan dihapus dari database.';
 
   const toggleTeacherSubject = (subjectId: string) => {
     setTeacherForm((current) => ({
@@ -523,10 +582,11 @@ export function AdminMasterDataPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleDelete('teacher', item.id)}
-            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+            disabled={deletingMasterDataKey === `teacher-${item.id}`}
+            onClick={() => requestMasterDataDelete('teacher', item.id, item.name)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
           >
-            Hapus
+            {deletingMasterDataKey === `teacher-${item.id}` ? 'Menghapus...' : 'Hapus'}
           </button>
         </div>
       ),
@@ -560,10 +620,11 @@ export function AdminMasterDataPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleDelete('class', item.id)}
-            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+            disabled={deletingMasterDataKey === `class-${item.id}`}
+            onClick={() => requestMasterDataDelete('class', item.id, item.name)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
           >
-            Hapus
+            {deletingMasterDataKey === `class-${item.id}` ? 'Menghapus...' : 'Hapus'}
           </button>
         </div>
       ),
@@ -592,15 +653,22 @@ export function AdminMasterDataPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleDelete('subject', item.id)}
-            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+            disabled={deletingMasterDataKey === `subject-${item.id}`}
+            onClick={() => requestMasterDataDelete('subject', item.id, item.name)}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
           >
-            Hapus
+            {deletingMasterDataKey === `subject-${item.id}` ? 'Menghapus...' : 'Hapus'}
           </button>
         </div>
       ),
     },
   ];
+
+  const getScheduleLabel = (schedule: Schedule) => {
+    const className = databaseClasses.find((classItem) => classItem.id === schedule.classId)?.name ?? '-';
+    const subjectName = databaseSubjects.find((subject) => subject.id === schedule.subjectId)?.name ?? '-';
+    return `${className} - ${subjectName} (${formatDayName(schedule.day)}, ${schedule.startTime}-${schedule.endTime})`;
+  };
 
   const scheduleColumns: TableColumn<Schedule>[] = [
     { key: 'day', header: 'Hari', render: (item) => formatDayName(item.day) },
@@ -635,10 +703,11 @@ export function AdminMasterDataPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleDelete('schedule', item.id)}
-            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+            disabled={deletingMasterDataKey === `schedule-${item.id}`}
+            onClick={() => requestMasterDataDelete('schedule', item.id, getScheduleLabel(item))}
+            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
           >
-            Hapus
+            {deletingMasterDataKey === `schedule-${item.id}` ? 'Menghapus...' : 'Hapus'}
           </button>
         </div>
       ),
@@ -1282,6 +1351,17 @@ export function AdminMasterDataPage() {
           />
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(deleteConfirmation)}
+        title={deleteConfirmationTitle}
+        description={deleteConfirmationDescription}
+        tone="danger"
+        confirmLabel={isDeleteConfirmationLoading ? 'Menghapus...' : 'Hapus'}
+        isLoading={isDeleteConfirmationLoading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirmation(null)}
+      />
     </div>
   );
 }
