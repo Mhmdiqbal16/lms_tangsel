@@ -176,7 +176,11 @@ interface AppDataContextValue extends AppDataState {
   saveStudentAttendances: (payload: SaveStudentAttendancesPayload) => ActionResult;
   addLearningMaterial: (payload: AddLearningMaterialPayload) => Promise<ActionResult>;
   addAssessmentBundle: (payload: AddAssessmentBundlePayload) => Promise<ActionResult>;
-  completeAssessment: (assessmentId: string, studentId: string) => Promise<ActionResult>;
+  completeAssessment: (
+    assessmentId: string,
+    studentId: string,
+    answers: Array<{ questionId: string; answer: string }>,
+  ) => Promise<ActionResult>;
   completeQuestionnaire: (payload: {
     studentId: string;
     teacherId: string;
@@ -684,7 +688,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         return getApiActionError(error, 'Paket pretest dan posttest gagal disimpan.');
       }
     },
-    completeAssessment: async (assessmentId, studentId) => {
+    completeAssessment: async (assessmentId, studentId, answers) => {
       if (!session || session.role !== 'siswa' || session.referenceId !== studentId) {
         return {
           success: false,
@@ -695,7 +699,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       try {
         const updatedAssessment = await apiRequest<AssessmentRecord>('/api/student/assessments/complete', {
           method: 'POST',
-          body: JSON.stringify({ assessmentId, studentId }),
+          body: JSON.stringify({ assessmentId, studentId, answers }),
         });
 
         setState((current) => ({

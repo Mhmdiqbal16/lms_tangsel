@@ -117,6 +117,12 @@ export type AssessmentQuestion = {
   answer: string;
 };
 
+export type AssessmentStudentAnswer = {
+  questionId: string;
+  answer: string;
+  correct: boolean;
+};
+
 export type AssessmentRecord = {
   id: string;
   type: AssessmentType;
@@ -132,6 +138,9 @@ export type AssessmentRecord = {
   studentStatuses: Array<{
     studentId: string;
     completed: boolean;
+    completedAt?: string;
+    score?: number;
+    answers?: AssessmentStudentAnswer[];
   }>;
 };
 

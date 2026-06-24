@@ -9,8 +9,8 @@ import { GuruMateriPage } from '@/pages/guru/GuruMateriPage';
 import { GuruPresensiPage } from '@/pages/guru/GuruPresensiPage';
 import { GuruProfilPage } from '@/pages/guru/GuruProfilPage';
 import { GuruRiwayatPage } from '@/pages/guru/GuruRiwayatPage';
-import { GuruTestPage } from '@/pages/guru/GuruTestPage';
 import { KurikulumDashboardPage } from '@/pages/kurikulum/KurikulumDashboardPage';
+import { KurikulumHasilPosttestPage } from '@/pages/kurikulum/KurikulumHasilPosttestPage';
 import { KurikulumJurnalSiswaPage } from '@/pages/kurikulum/KurikulumJurnalSiswaPage';
 import { KurikulumKehadiranGuruPage } from '@/pages/kurikulum/KurikulumKehadiranGuruPage';
 import { KurikulumLaporanPage } from '@/pages/kurikulum/KurikulumLaporanPage';
@@ -93,9 +93,7 @@ export function AppRouter() {
             >
               <Route path="/guru/jurnal-siswa" element={<GuruJurnalSiswaPage />} />
             </Route>
-            <Route element={<ProtectedRoute allowedRoles={['guru']} requiredPermission="assessment.manage" />}>
-              <Route path="/guru/test" element={<GuruTestPage />} />
-            </Route>
+            <Route path="/guru/test" element={<Navigate to="/guru/materi" replace />} />
             <Route
               element={<ProtectedRoute allowedRoles={['guru']} requiredPermission="teaching.history.view_own" />}
             >
@@ -132,6 +130,11 @@ export function AppRouter() {
               element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="student.journal.monitor" />}
             >
               <Route path="/kurikulum/jurnal-siswa" element={<KurikulumJurnalSiswaPage />} />
+            </Route>
+            <Route
+              element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="assessment.result.view" />}
+            >
+              <Route path="/kurikulum/hasil-posttest" element={<KurikulumHasilPosttestPage />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="report.view" />}>
               <Route path="/kurikulum/laporan" element={<KurikulumLaporanPage />} />

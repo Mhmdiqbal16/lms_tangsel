@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Bell, BookOpenText, CalendarDays, ClipboardCheck, NotebookPen } from 'lucide-react';
+import { Bell, BookOpenText, CalendarDays, NotebookPen } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -8,7 +8,7 @@ import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
 import { getJournalEligibility } from '@/utils/businessRules';
-import { formatDateID, formatDayName, getMonthKey, parseISODate } from '@/utils/date';
+import { formatDateID, formatDayName, parseISODate } from '@/utils/date';
 
 const statusVariantMap = {
   Selesai: 'green',
@@ -24,7 +24,6 @@ export function SiswaDashboardPage() {
     schedules,
     subjects,
     teachers,
-    studentAttendances,
     notifications,
     studentJournals,
     assessments,
@@ -43,10 +42,15 @@ export function SiswaDashboardPage() {
   const todayJournalCount = studentJournals.filter(
     (item) => item.studentId === student.id && item.date === academicDateReference,
   ).length;
-  const attendanceThisMonth = studentAttendances.filter(
-    (item) => item.studentId === student.id && getMonthKey(item.date) === getMonthKey(academicDateReference),
-  );
-  const presentThisMonth = attendanceThisMonth.filter((item) => item.status === 'Hadir').length;
+  const pendingJournalCount = todaySchedules.filter(
+    (schedule) =>
+      !studentJournals.some(
+        (journal) =>
+          journal.studentId === student.id &&
+          journal.scheduleId === schedule.id &&
+          journal.date === academicDateReference,
+      ),
+  ).length;
   const roleNotifications = notifications.filter((item) => item.role === 'siswa' || item.role === 'all');
 
   return (
@@ -64,10 +68,10 @@ export function SiswaDashboardPage() {
           icon={NotebookPen}
         />
         <StatCard
-          title="Absensi Bulan Ini"
-          value={`${presentThisMonth}/${attendanceThisMonth.length || 0}`}
-          description="Rekap kehadiran bulan berjalan berdasarkan jadwal pelajaran yang diterima."
-          icon={ClipboardCheck}
+          title="Jurnal Belum Diisi"
+          value={pendingJournalCount}
+          description="Jumlah jadwal hari ini yang belum memiliki jurnal pembelajaran."
+          icon={NotebookPen}
         />
         <StatCard
           title="Mapel Hari Ini"

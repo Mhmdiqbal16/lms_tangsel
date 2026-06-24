@@ -1,6 +1,7 @@
 -- Gunakan hanya kalau database Supabase masih tahap setup/dev.
 -- File ini menghapus tabel aplikasi agar schema.sql bisa dibuat ulang dengan tipe ID text.
 
+drop table if exists assessment_student_answers cascade;
 drop table if exists assessment_student_statuses cascade;
 drop table if exists assessment_questions cascade;
 drop table if exists assessments cascade;

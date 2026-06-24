@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import type { AssessmentRecord } from '@/types';
 import { formatDateID, formatDayName } from '@/utils/date';
 import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
-import { NotebookPen } from 'lucide-react';
+import { ArrowLeft, NotebookPen } from 'lucide-react';
 
 const optionLabels = ['A', 'B', 'C', 'D'];
 
@@ -87,7 +87,14 @@ export function SiswaAssessmentPage({ type }: SiswaAssessmentPageProps) {
     }
 
     setPendingAssessmentId(targetAssessment.id);
-    const result = await completeAssessment(targetAssessment.id, student.id);
+    const result = await completeAssessment(
+      targetAssessment.id,
+      student.id,
+      targetAssessment.questions.map((question) => ({
+        questionId: question.id,
+        answer: currentAnswers[question.id],
+      })),
+    );
     setPendingAssessmentId(null);
     setMessage({
       tone: result.success ? 'success' : 'warning',
@@ -99,11 +106,19 @@ export function SiswaAssessmentPage({ type }: SiswaAssessmentPageProps) {
     return (
       <div className="space-y-6">
         <PageHeader title={label} description={`Belum ada sesi belajar yang tersedia untuk ${label.toLowerCase()}.`} />
+        <Link
+          to="/siswa/jurnal"
+          className="inline-flex items-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Kembali ke Isi Jurnal
+        </Link>
       </div>
     );
   }
 
   const currentAnswers = assessment ? answers[assessment.id] ?? {} : {};
+  const journalReturnPath = `/siswa/jurnal?scheduleId=${selectedSession.schedule.id}&date=${selectedSession.sessionDate}`;
 
   return (
     <div className="space-y-6">
@@ -115,6 +130,13 @@ export function SiswaAssessmentPage({ type }: SiswaAssessmentPageProps) {
             : 'Pretest dikerjakan sebelum siswa mengisi jurnal pembelajaran.'
         }
       />
+      <Link
+        to={journalReturnPath}
+        className="inline-flex items-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Kembali ke Isi Jurnal
+      </Link>
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
 
@@ -235,10 +257,10 @@ export function SiswaAssessmentPage({ type }: SiswaAssessmentPageProps) {
                     {pendingAssessmentId === assessment.id ? 'Mengirim...' : `Kumpulkan ${label}`}
                   </button>
                   <Link
-                    to={`/siswa/jurnal?scheduleId=${selectedSession.schedule.id}&date=${selectedSession.sessionDate}`}
+                    to={journalReturnPath}
                     className="rounded-2xl border border-brand-200 px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                   >
-                    Kembali ke Jurnal
+                    Kembali ke Isi Jurnal
                   </Link>
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { DataTable, TableColumn } from '@/components/tables/DataTable';
 import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
+import { GuruAssessmentSection } from '@/pages/guru/GuruTestPage';
 import { formatDateID, formatDayName } from '@/utils/date';
 
 interface MaterialRow {
@@ -99,7 +100,7 @@ export function GuruMateriPage() {
     <div className="space-y-6">
       <PageHeader
         title="Input Materi"
-        description="Guru menginput materi pembelajaran sesuai jadwal yang akan dipakai siswa sebagai acuan saat mengisi jurnal."
+        description="Guru menginput materi pembelajaran dan membuat pretest serta posttest dalam satu halaman."
       />
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
@@ -224,6 +225,16 @@ export function GuruMateriPage() {
         emptyTitle="Materi belum tersedia"
         emptyDescription="Belum ada materi yang diinput guru pada data mock saat ini."
       />
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Pretest & Posttest</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Buat paket soal pilihan ganda untuk jadwal dan pertemuan materi yang sama.
+          </p>
+        </div>
+        <GuruAssessmentSection showHeader={false} />
+      </section>
     </div>
   );
 }

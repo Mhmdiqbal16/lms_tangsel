@@ -12,6 +12,7 @@ export type Permission =
   | 'learning.material.create'
   | 'student.journal.view_taught_classes'
   | 'assessment.manage'
+  | 'assessment.result.view'
   | 'teaching.history.view_own'
   | 'dashboard.monitor'
   | 'teacher.attendance.monitor'
@@ -136,6 +137,12 @@ export interface AssessmentQuestion {
   answer: string;
 }
 
+export interface AssessmentStudentAnswer {
+  questionId: string;
+  answer: string;
+  correct: boolean;
+}
+
 export interface AssessmentRecord {
   id: string;
   type: AssessmentType;
@@ -151,6 +158,9 @@ export interface AssessmentRecord {
   studentStatuses: Array<{
     studentId: string;
     completed: boolean;
+    completedAt?: string;
+    score?: number;
+    answers?: AssessmentStudentAnswer[];
   }>;
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -123,9 +124,18 @@ export function SiswaKuisionerPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Kuisioner Guru" description="Belum ada sesi belajar yang tersedia untuk kuisioner." />
+        <Link
+          to="/siswa/jurnal"
+          className="inline-flex items-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Kembali ke Isi Jurnal
+        </Link>
       </div>
     );
   }
+
+  const journalReturnPath = `/siswa/jurnal?scheduleId=${selectedSession.schedule.id}&date=${selectedSession.sessionDate}`;
 
   return (
     <div className="space-y-6">
@@ -133,6 +143,13 @@ export function SiswaKuisionerPage() {
         title="Kuisioner Guru"
         description="Kuisioner terbuka setelah jurnal untuk sesi ini dikirim."
       />
+      <Link
+        to={journalReturnPath}
+        className="inline-flex items-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Kembali ke Isi Jurnal
+      </Link>
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
 
@@ -261,10 +278,10 @@ export function SiswaKuisionerPage() {
                   {pendingKey === selectedSession.key ? 'Mengirim...' : 'Kirim Kuisioner'}
                 </button>
                 <Link
-                  to={`/siswa/jurnal?scheduleId=${selectedSession.schedule.id}&date=${selectedSession.sessionDate}`}
+                  to={journalReturnPath}
                   className="rounded-2xl border border-brand-200 px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                 >
-                  Kembali ke Jurnal
+                  Kembali ke Isi Jurnal
                 </Link>
               </div>
             </div>

@@ -199,6 +199,18 @@ create table if not exists assessment_student_statuses (
   primary key (assessment_id, student_id)
 );
 
+create table if not exists assessment_student_answers (
+  assessment_id text not null references assessments(id) on delete cascade,
+  student_id text not null references students(id) on delete cascade,
+  question_id text not null references assessment_questions(id) on delete cascade,
+  answer text not null,
+  correct boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (assessment_id, student_id, question_id),
+  foreign key (assessment_id, student_id) references assessment_student_statuses(assessment_id, student_id) on delete cascade
+);
+
 create table if not exists teacher_questionnaires (
   id text primary key,
   student_id text not null references students(id) on delete restrict,
@@ -261,5 +273,6 @@ alter table learning_materials enable row level security;
 alter table assessments enable row level security;
 alter table assessment_questions enable row level security;
 alter table assessment_student_statuses enable row level security;
+alter table assessment_student_answers enable row level security;
 alter table teacher_questionnaires enable row level security;
 alter table student_journals enable row level security;

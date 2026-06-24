@@ -25,6 +25,7 @@ import type {
   Admin,
   AssessmentQuestion,
   AssessmentRecord,
+  AssessmentStudentAnswer,
   ClassRoom,
   Curriculum,
   LearningMaterial,
@@ -162,6 +163,15 @@ type AssessmentStudentStatusRow = {
   assessment_id: string;
   student_id: string;
   completed: boolean;
+  completed_at: string | null;
+};
+
+type AssessmentStudentAnswerRow = {
+  assessment_id: string;
+  student_id: string;
+  question_id: string;
+  answer: string;
+  correct: boolean;
 };
 
 type TeacherQuestionnaireRow = {
@@ -250,6 +260,11 @@ export type SaveScheduleInput = {
   startTime: string;
   endTime: string;
   room: string;
+};
+
+export type AssessmentAnswerInput = {
+  questionId: string;
+  answer: string;
 };
 
 function toShortTime(value: string) {
@@ -440,6 +455,14 @@ function toAssessmentQuestion(row: AssessmentQuestionRow): AssessmentQuestion {
   };
 }
 
+function toAssessmentStudentAnswer(row: AssessmentStudentAnswerRow): AssessmentStudentAnswer {
+  return {
+    questionId: row.question_id,
+    answer: row.answer,
+    correct: row.correct,
+  };
+}
+
 function toAssessment(
   row: AssessmentRow,
   questions: AssessmentQuestion[],
@@ -490,7 +513,25 @@ function toStudentJournal(row: StudentJournalRow): StudentJournal {
   };
 }
 
-function throwSupabaseError(message: string, error: { message: string } | null) {
+type SupabaseRepositoryError = {
+  code?: string;
+  details?: string | null;
+  message: string;
+};
+
+function isMissingSupabaseTable(error: SupabaseRepositoryError | null, tableName: string) {
+  if (!error) {
+    return false;
+  }
+
+  const errorText = `${error.message} ${error.details ?? ''}`;
+  return (
+    errorText.includes(tableName) &&
+    (error.code === 'PGRST205' || errorText.includes('schema cache') || errorText.includes('does not exist'))
+  );
+}
+
+function throwSupabaseError(message: string, error: SupabaseRepositoryError | null) {
   if (error) {
     throw new Error(`${message}: ${error.message}`);
   }
@@ -614,6 +655,7 @@ export async function createAccount(input: CreateAccountInput) {
     }
 
     let linkedStudent: Student | null = null;
+    let linkedTeacher: Teacher | null = null;
 
     if (input.role === 'siswa') {
       const requestedStudentId = input.referenceId?.trim();
@@ -621,24 +663,45 @@ export async function createAccount(input: CreateAccountInput) {
         ? mockStudents.find((student) => student.id === requestedStudentId) ?? null
         : mockStudents.find((student) => student.nisn === identifier) ?? null;
 
-      if (requestedStudentId && !linkedStudent) {
+      if (!linkedStudent) {
         throw new RepositoryError('Profil siswa yang dipilih tidak ditemukan.', 404);
       }
 
-      if (linkedStudent && linkedStudent.nisn !== identifier) {
+      if (linkedStudent.nisn !== identifier) {
         throw new RepositoryError('Identitas login akun siswa harus sama dengan NISN profil siswa.', 422);
       }
 
-      if (linkedStudent) {
-        const linkedStudentId = linkedStudent.id;
+      const linkedStudentId = linkedStudent.id;
 
-        if (linkedStudent.userId || mockUsers.some((user) => user.referenceId === linkedStudentId)) {
-          throw new RepositoryError('Siswa ini sudah memiliki akun login.', 409);
+      if (linkedStudent.userId || mockUsers.some((user) => user.referenceId === linkedStudentId)) {
+        throw new RepositoryError('Siswa ini sudah memiliki akun login.', 409);
+      }
+
+      referenceId = linkedStudent.id;
+    }
+
+    if (input.role === 'guru') {
+      const requestedTeacherId = input.referenceId?.trim();
+      linkedTeacher = requestedTeacherId
+        ? mockTeachers.find((teacher) => teacher.id === requestedTeacherId) ?? null
+        : mockTeachers.find((teacher) => teacher.nip === identifier) ?? null;
+
+      if (requestedTeacherId && !linkedTeacher) {
+        throw new RepositoryError('Profil guru yang dipilih tidak ditemukan.', 404);
+      }
+
+      if (linkedTeacher && linkedTeacher.nip !== identifier) {
+        throw new RepositoryError('Identitas login akun guru harus sama dengan NIP profil guru.', 422);
+      }
+
+      if (linkedTeacher) {
+        const linkedTeacherId = linkedTeacher.id;
+
+        if (linkedTeacher.userId || mockUsers.some((user) => user.role === 'guru' && user.referenceId === linkedTeacherId)) {
+          throw new RepositoryError('Guru ini sudah memiliki akun login.', 409);
         }
 
-        referenceId = linkedStudent.id;
-      } else if (!input.classId) {
-        throw new RepositoryError('Kelas wajib dipilih saat membuat akun siswa baru.', 422);
+        referenceId = linkedTeacher.id;
       }
     }
 
@@ -654,28 +717,20 @@ export async function createAccount(input: CreateAccountInput) {
     mockUsers.unshift(user);
 
     if (input.role === 'siswa') {
-      if (linkedStudent) {
-        linkedStudent.userId = userId;
+      linkedStudent!.userId = userId;
+    } else if (input.role === 'guru') {
+      if (linkedTeacher) {
+        linkedTeacher.userId = userId;
       } else {
-        mockStudents.unshift({
+        mockTeachers.unshift({
           id: referenceId,
           userId,
           name,
-          nisn: identifier,
-          classId: input.classId ?? '',
+          nip: identifier,
           email,
-          avatar: getInitials(name),
+          subjectIds: input.subjectIds ?? [],
         });
       }
-    } else if (input.role === 'guru') {
-      mockTeachers.unshift({
-        id: referenceId,
-        userId,
-        name,
-        nip: identifier,
-        email,
-        subjectIds: input.subjectIds ?? [],
-      });
     } else if (input.role === 'kurikulum') {
       mockCurricula.unshift({
         id: referenceId,
@@ -726,52 +781,70 @@ export async function createAccount(input: CreateAccountInput) {
   const curriculumEmployeeId = encodeRoleScopedIdentifier('kurikulum', input.employeeId?.trim() ?? '');
 
   let linkedStudent: Student | null = null;
+  let linkedTeacher: Teacher | null = null;
 
   if (input.role === 'siswa') {
     const requestedStudentId = input.referenceId?.trim();
     linkedStudent = requestedStudentId ? await getStudentById(requestedStudentId) : await getStudentByNisn(identifier);
 
-    if (requestedStudentId && !linkedStudent) {
+    if (!linkedStudent) {
       throw new RepositoryError('Profil siswa yang dipilih tidak ditemukan.', 404);
     }
 
-    if (linkedStudent && linkedStudent.nisn !== identifier) {
+    if (linkedStudent.nisn !== identifier) {
       throw new RepositoryError('Identitas login akun siswa harus sama dengan NISN profil siswa.', 422);
     }
 
-    if (linkedStudent) {
-      const { data: existingProfileUser, error: existingProfileUserError } = await supabase
-        .from('app_users')
-        .select('id')
-        .eq('role', 'siswa')
-        .eq('reference_id', linkedStudent.id)
-        .maybeSingle();
+    const { data: existingProfileUser, error: existingProfileUserError } = await supabase
+      .from('app_users')
+      .select('id')
+      .eq('role', 'siswa')
+      .eq('reference_id', linkedStudent.id)
+      .maybeSingle();
 
-      throwSupabaseError('Gagal memeriksa akun siswa', existingProfileUserError);
+    throwSupabaseError('Gagal memeriksa akun siswa', existingProfileUserError);
 
-      if (linkedStudent.userId || existingProfileUser) {
-        throw new RepositoryError('Siswa ini sudah memiliki akun login.', 409);
-      }
-
-      referenceId = linkedStudent.id;
-    } else {
-      if (!input.classId) {
-        throw new RepositoryError('Kelas wajib dipilih saat membuat akun siswa baru.', 422);
-      }
-
-      const classRoom = await getClassById(input.classId);
-      if (!classRoom) {
-        throw new RepositoryError('Kelas tidak ditemukan di database. Buat kelas dari tab Kelas terlebih dahulu.', 422);
-      }
+    if (linkedStudent.userId || existingProfileUser) {
+      throw new RepositoryError('Siswa ini sudah memiliki akun login.', 409);
     }
+
+    referenceId = linkedStudent.id;
   }
 
   if (input.role === 'guru') {
-    const subjectIds = input.subjectIds?.filter(Boolean) ?? [];
-    for (const subjectId of subjectIds) {
-      const subject = await getSubjectById(subjectId);
-      if (!subject) {
-        throw new RepositoryError('Ada mata pelajaran yang tidak ditemukan di database.', 422);
+    const requestedTeacherId = input.referenceId?.trim();
+    linkedTeacher = requestedTeacherId ? await getTeacherById(requestedTeacherId) : await getTeacherByNip(identifier);
+
+    if (requestedTeacherId && !linkedTeacher) {
+      throw new RepositoryError('Profil guru yang dipilih tidak ditemukan.', 404);
+    }
+
+    if (linkedTeacher && linkedTeacher.nip !== identifier) {
+      throw new RepositoryError('Identitas login akun guru harus sama dengan NIP profil guru.', 422);
+    }
+
+    if (linkedTeacher) {
+      const { data: existingProfileUser, error: existingProfileUserError } = await supabase
+        .from('app_users')
+        .select('id')
+        .eq('role', 'guru')
+        .eq('reference_id', linkedTeacher.id)
+        .maybeSingle();
+
+      throwSupabaseError('Gagal memeriksa akun guru', existingProfileUserError);
+
+      if (linkedTeacher.userId || existingProfileUser) {
+        throw new RepositoryError('Guru ini sudah memiliki akun login.', 409);
+      }
+
+      referenceId = linkedTeacher.id;
+    } else {
+      const subjectIds = input.subjectIds?.filter(Boolean) ?? [];
+      for (const subjectId of subjectIds) {
+        const subject = await getSubjectById(subjectId);
+        if (!subject) {
+          throw new RepositoryError('Ada mata pelajaran yang tidak ditemukan di database.', 422);
+        }
       }
     }
   }
@@ -793,40 +866,32 @@ export async function createAccount(input: CreateAccountInput) {
 
   try {
     if (input.role === 'siswa') {
-      if (linkedStudent) {
-        const { error } = await supabase.from('students').update({ user_id: userId }).eq('id', linkedStudent.id);
-        throwSupabaseError('Gagal menghubungkan akun ke profil siswa', error);
+      const { error } = await supabase.from('students').update({ user_id: userId }).eq('id', referenceId);
+      throwSupabaseError('Gagal menghubungkan akun ke profil siswa', error);
+    } else if (input.role === 'guru') {
+      if (linkedTeacher) {
+        const { error } = await supabase.from('teachers').update({ user_id: userId }).eq('id', linkedTeacher.id);
+        throwSupabaseError('Gagal menghubungkan akun ke profil guru', error);
       } else {
-        const { error } = await supabase.from('students').insert({
+        const { error } = await supabase.from('teachers').insert({
           id: referenceId,
           user_id: userId,
           name,
-          nisn: identifier,
-          class_id: input.classId,
+          nip: identifier,
           email,
-          avatar: getInitials(name),
         });
-        throwSupabaseError('Gagal membuat profil siswa', error);
-      }
-    } else if (input.role === 'guru') {
-      const { error } = await supabase.from('teachers').insert({
-        id: referenceId,
-        user_id: userId,
-        name,
-        nip: identifier,
-        email,
-      });
-      throwSupabaseError('Gagal membuat profil guru', error);
+        throwSupabaseError('Gagal membuat profil guru', error);
 
-      const subjectIds = input.subjectIds?.filter(Boolean) ?? [];
-      if (subjectIds.length > 0) {
-        const { error: subjectError } = await supabase.from('teacher_subjects').insert(
-          subjectIds.map((subjectId) => ({
-            teacher_id: referenceId,
-            subject_id: subjectId,
-          })),
-        );
-        throwSupabaseError('Gagal menyimpan mapel guru', subjectError);
+        const subjectIds = input.subjectIds?.filter(Boolean) ?? [];
+        if (subjectIds.length > 0) {
+          const { error: subjectError } = await supabase.from('teacher_subjects').insert(
+            subjectIds.map((subjectId) => ({
+              teacher_id: referenceId,
+              subject_id: subjectId,
+            })),
+          );
+          throwSupabaseError('Gagal menyimpan mapel guru', subjectError);
+        }
       }
     } else if (input.role === 'kurikulum') {
       const { error } = await supabase.from('curricula').insert({
@@ -1103,6 +1168,29 @@ export async function getTeacherById(teacherId: string) {
   const { data, error } = await supabase.from('teachers').select('*').eq('id', teacherId).maybeSingle();
   throwSupabaseError('Gagal mengambil guru', error);
   return data ? toTeacher(data as TeacherRow, await getTeacherSubjectIds(teacherId)) : null;
+}
+
+export async function getTeacherByNip(nip: string) {
+  const normalizedNip = nip.trim();
+
+  if (!normalizedNip) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return mockTeachers.find((teacher) => teacher.nip === normalizedNip) ?? null;
+  }
+
+  const { data, error } = await supabase.from('teachers').select('*').eq('nip', normalizedNip).maybeSingle();
+  throwSupabaseError('Gagal mengambil guru', error);
+
+  if (!data) {
+    return null;
+  }
+
+  const teacher = data as TeacherRow;
+  return toTeacher(teacher, await getTeacherSubjectIds(teacher.id));
 }
 
 export async function listTeachers() {
@@ -1755,6 +1843,44 @@ async function getAssessmentQuestions(assessmentIds: string[]) {
   return questionMap;
 }
 
+async function getAssessmentStudentAnswers(assessmentIds: string[]) {
+  const supabase = getSupabaseAdmin();
+  const answerMap = new Map<string, AssessmentStudentAnswer[]>();
+
+  if (!assessmentIds.length) {
+    return answerMap;
+  }
+
+  if (!supabase) {
+    mockAssessments.forEach((assessment) => {
+      assessment.studentStatuses.forEach((status) => {
+        answerMap.set(`${assessment.id}:${status.studentId}`, status.answers ?? []);
+      });
+    });
+    return answerMap;
+  }
+
+  const { data, error } = await supabase
+    .from('assessment_student_answers')
+    .select('*')
+    .in('assessment_id', assessmentIds);
+
+  if (isMissingSupabaseTable(error, 'assessment_student_answers')) {
+    return answerMap;
+  }
+
+  throwSupabaseError('Gagal mengambil jawaban assessment siswa', error);
+
+  (data ?? []).forEach((row) => {
+    const answerRow = row as AssessmentStudentAnswerRow;
+    const key = `${answerRow.assessment_id}:${answerRow.student_id}`;
+    const current = answerMap.get(key) ?? [];
+    answerMap.set(key, [...current, toAssessmentStudentAnswer(answerRow)]);
+  });
+
+  return answerMap;
+}
+
 async function getAssessmentStudentStatuses(assessmentIds: string[]) {
   const supabase = getSupabaseAdmin();
   const statusMap = new Map<string, AssessmentRecord['studentStatuses']>();
@@ -1762,6 +1888,8 @@ async function getAssessmentStudentStatuses(assessmentIds: string[]) {
   if (!assessmentIds.length) {
     return statusMap;
   }
+
+  const answerMap = await getAssessmentStudentAnswers(assessmentIds);
 
   if (!supabase) {
     mockAssessments.forEach((assessment) => {
@@ -1785,6 +1913,9 @@ async function getAssessmentStudentStatuses(assessmentIds: string[]) {
       {
         studentId: statusRow.student_id,
         completed: statusRow.completed,
+        completedAt: statusRow.completed_at ?? undefined,
+        score: (answerMap.get(`${statusRow.assessment_id}:${statusRow.student_id}`) ?? []).filter((answer) => answer.correct).length,
+        answers: answerMap.get(`${statusRow.assessment_id}:${statusRow.student_id}`) ?? [],
       },
     ]);
   });
@@ -1939,7 +2070,24 @@ export async function createAssessments(assessments: AssessmentRecord[]) {
   return saved;
 }
 
-export async function completeAssessmentForStudent(assessmentId: string, studentId: string) {
+function buildStudentAssessmentAnswers(assessment: AssessmentRecord, answers: AssessmentAnswerInput[]) {
+  const answerMap = new Map(answers.map((item) => [item.questionId, item.answer]));
+
+  return assessment.questions.map((question) => {
+    const selectedAnswer = answerMap.get(question.id) ?? '';
+    return {
+      questionId: question.id,
+      answer: selectedAnswer,
+      correct: selectedAnswer === question.answer,
+    };
+  });
+}
+
+export async function completeAssessmentForStudent(
+  assessmentId: string,
+  studentId: string,
+  answers: AssessmentAnswerInput[],
+) {
   const supabase = getSupabaseAdmin();
 
   if (!supabase) {
@@ -1948,11 +2096,29 @@ export async function completeAssessmentForStudent(assessmentId: string, student
       return null;
     }
 
+    const studentAnswers = buildStudentAssessmentAnswers(assessment, answers);
+    const completedAt = new Date().toISOString();
+
     assessment.studentStatuses = assessment.studentStatuses.map((status) =>
-      status.studentId === studentId ? { ...status, completed: true } : status,
+      status.studentId === studentId
+        ? {
+            ...status,
+            completed: true,
+            completedAt,
+            score: studentAnswers.filter((answer) => answer.correct).length,
+            answers: studentAnswers,
+          }
+        : status,
     );
     return assessment;
   }
+
+  const assessment = await getAssessmentById(assessmentId);
+  if (!assessment) {
+    return null;
+  }
+
+  const studentAnswers = buildStudentAssessmentAnswers(assessment, answers);
 
   const { error } = await supabase
     .from('assessment_student_statuses')
@@ -1961,6 +2127,33 @@ export async function completeAssessmentForStudent(assessmentId: string, student
     .eq('student_id', studentId);
 
   throwSupabaseError('Gagal memperbarui status assessment siswa', error);
+
+  const { error: deleteAnswerError } = await supabase
+    .from('assessment_student_answers')
+    .delete()
+    .eq('assessment_id', assessmentId)
+    .eq('student_id', studentId);
+
+  if (isMissingSupabaseTable(deleteAnswerError, 'assessment_student_answers')) {
+    return getAssessmentById(assessmentId);
+  }
+
+  throwSupabaseError('Gagal memperbarui jawaban assessment siswa', deleteAnswerError);
+
+  if (studentAnswers.length > 0) {
+    const { error: insertAnswerError } = await supabase.from('assessment_student_answers').insert(
+      studentAnswers.map((answer) => ({
+        assessment_id: assessmentId,
+        student_id: studentId,
+        question_id: answer.questionId,
+        answer: answer.answer,
+        correct: answer.correct,
+      })),
+    );
+
+    throwSupabaseError('Gagal menyimpan jawaban assessment siswa', insertAnswerError);
+  }
+
   return getAssessmentById(assessmentId);
 }
 

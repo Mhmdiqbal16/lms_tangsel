@@ -23,6 +23,10 @@ type TestConfirmation =
   | { type: 'remove-question'; section: QuestionSection; index: number }
   | { type: 'copy-pretest' };
 
+interface GuruAssessmentSectionProps {
+  showHeader?: boolean;
+}
+
 function createEmptyQuestion(): QuestionDraft {
   return {
     question: '',
@@ -35,7 +39,7 @@ function getInitialQuestions() {
   return [createEmptyQuestion()];
 }
 
-export function GuruTestPage() {
+export function GuruAssessmentSection({ showHeader = true }: GuruAssessmentSectionProps) {
   const { session } = useAuth();
   const { teachers, schedules, classes, subjects, assessments, addAssessmentBundle } = useAppData();
   const teacher = teachers.find((item) => item.id === session?.referenceId);
@@ -378,10 +382,12 @@ export function GuruTestPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Pretest & Posttest"
-        description="Guru membuat soal pilihan ganda untuk pretest dan posttest. Setiap paket maksimal 10 soal."
-      />
+      {showHeader ? (
+        <PageHeader
+          title="Pretest & Posttest"
+          description="Guru membuat soal pilihan ganda untuk pretest dan posttest. Setiap paket maksimal 10 soal."
+        />
+      ) : null}
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
 
@@ -554,4 +560,8 @@ export function GuruTestPage() {
       />
     </div>
   );
+}
+
+export function GuruTestPage() {
+  return <GuruAssessmentSection />;
 }

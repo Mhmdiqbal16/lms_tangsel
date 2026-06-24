@@ -208,6 +208,17 @@ entity "assessment_student_statuses" as assessment_student_statuses {
   completed_at : timestamptz
 }
 
+entity "assessment_student_answers" as assessment_student_answers {
+  * assessment_id : text <<PK, FK>>
+  * student_id : text <<PK, FK>>
+  * question_id : text <<PK, FK>>
+  --
+  * answer : text
+  * correct : boolean
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+
 entity "teacher_questionnaires" as teacher_questionnaires {
   * id : text <<PK>>
   --
@@ -275,6 +286,10 @@ subjects ||--o{ assessments : subject_id
 assessments ||--o{ assessment_questions : assessment_id
 assessments ||--o{ assessment_student_statuses : assessment_id
 students ||--o{ assessment_student_statuses : student_id
+assessments ||--o{ assessment_student_answers : assessment_id
+students ||--o{ assessment_student_answers : student_id
+assessment_questions ||--o{ assessment_student_answers : question_id
+assessment_student_statuses ||--o{ assessment_student_answers : assessment_student
 
 ' Student feedback and journal relationships.
 students ||--o{ teacher_questionnaires : student_id

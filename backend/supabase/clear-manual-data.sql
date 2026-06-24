@@ -4,6 +4,7 @@
 
 begin;
 
+delete from assessment_student_answers;
 delete from assessment_student_statuses;
 delete from assessment_questions;
 delete from assessments;

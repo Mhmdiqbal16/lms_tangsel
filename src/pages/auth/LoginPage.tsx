@@ -114,7 +114,7 @@ export function LoginPage() {
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand-100">Informasi</p>
                   <p className="mt-1 text-sm leading-6 text-brand-50/90">
-                    lorem ipsum dolor sit amet consectetur adipisicing elit. Doloribus, sed! Voluptas, eaque. Eum, dicta
+                    Gunakan NISN untuk akun siswa, sedangkan guru dan kurikulum menggunakan NIP yang sudah terdaftar.
                   </p>
                 </div>
               </div>
@@ -127,7 +127,7 @@ export function LoginPage() {
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand-100">Informasi</p>
                   <p className="mt-1 text-sm leading-6 text-brand-50/90">
-                    lorem ipsum dolor sit amet consectetur adipisicing elit. Doloribus, sed! Voluptas, eaque. Eum, dicta
+                    Pastikan password benar dan jangan membagikan akun kepada orang lain demi keamanan data sekolah.
                   </p>
                 </div>
               </div>

@@ -230,6 +230,20 @@ Table assessment_student_statuses {
   }
 }
 
+Table assessment_student_answers {
+  assessment_id text [not null]
+  student_id text [not null]
+  question_id text [not null]
+  answer text [not null]
+  correct boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (assessment_id, student_id, question_id) [pk]
+  }
+}
+
 Table teacher_questionnaires {
   id text [pk]
   student_id text [not null]
@@ -302,6 +316,10 @@ Ref: assessments.subject_id > subjects.id [delete: restrict]
 Ref: assessment_questions.assessment_id > assessments.id [delete: cascade]
 Ref: assessment_student_statuses.assessment_id > assessments.id [delete: cascade]
 Ref: assessment_student_statuses.student_id > students.id [delete: cascade]
+Ref: assessment_student_answers.assessment_id > assessments.id [delete: cascade]
+Ref: assessment_student_answers.student_id > students.id [delete: cascade]
+Ref: assessment_student_answers.question_id > assessment_questions.id [delete: cascade]
+Ref: assessment_student_answers.(assessment_id, student_id) > assessment_student_statuses.(assessment_id, student_id) [delete: cascade]
 
 Ref: teacher_questionnaires.student_id > students.id [delete: restrict]
 Ref: teacher_questionnaires.teacher_id > teachers.id [delete: restrict]

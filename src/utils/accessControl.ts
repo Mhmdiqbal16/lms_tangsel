@@ -25,6 +25,7 @@ export const permissionsByRole: Record<Role, Permission[]> = {
     'teacher.attendance.monitor',
     'learning.material.monitor',
     'student.journal.monitor',
+    'assessment.result.view',
     'report.view',
     'validation.manage',
   ],

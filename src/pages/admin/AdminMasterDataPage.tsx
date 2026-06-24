@@ -29,12 +29,11 @@ const masterDataKindLabels: Record<MasterDataKind, string> = {
 
 const emptyAccountForm = {
   role: 'siswa' as Role,
-  studentId: '',
+  referenceId: '',
   identifier: '',
   password: '',
   name: '',
   email: '',
-  classId: '',
   employeeId: '',
   subjectIds: [] as string[],
 };
@@ -77,6 +76,16 @@ function upsertRecord<T extends { id: string }>(items: T[], nextItem: T) {
   return items.some((item) => item.id === nextItem.id)
     ? items.map((item) => (item.id === nextItem.id ? nextItem : item))
     : [nextItem, ...items];
+}
+
+function toTeacherForm(teacher: TeacherProfile) {
+  return {
+    id: teacher.id,
+    name: teacher.name,
+    nip: teacher.nip,
+    email: teacher.email,
+    subjectIds: [...teacher.subjectIds],
+  };
 }
 
 export function AdminMasterDataPage() {
@@ -313,11 +322,6 @@ export function AdminMasterDataPage() {
   const handleAccountSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (accountForm.role === 'siswa' && !accountForm.studentId && databaseClasses.length === 0) {
-      setMessage({ tone: 'warning', text: 'Buat kelas di tab Kelas terlebih dahulu sebelum membuat akun siswa baru.' });
-      return;
-    }
-
     setIsAccountSubmitting(true);
 
     try {
@@ -329,8 +333,7 @@ export function AdminMasterDataPage() {
           password: accountForm.password,
           name: accountForm.name,
           email: accountForm.email || undefined,
-          referenceId: accountForm.role === 'siswa' && accountForm.studentId ? accountForm.studentId : undefined,
-          classId: accountForm.role === 'siswa' ? accountForm.classId || undefined : undefined,
+          referenceId: accountForm.role === 'guru' && accountForm.referenceId ? accountForm.referenceId : undefined,
           employeeId: accountForm.role === 'kurikulum' ? accountForm.employeeId : undefined,
           subjectIds: accountForm.role === 'guru' ? accountForm.subjectIds : undefined,
         }),
@@ -442,27 +445,32 @@ export function AdminMasterDataPage() {
     }));
   };
 
-  const handleAccountStudentSelect = (studentId: string) => {
-    const student = databaseStudents.find((item) => item.id === studentId);
+  const handleTeacherSelect = (teacherId: string) => {
+    const teacher = databaseTeachers.find((item) => item.id === teacherId);
+    setTeacherForm(teacher ? toTeacherForm(teacher) : emptyTeacherForm);
+  };
+
+  const handleAccountTeacherSelect = (teacherId: string) => {
+    const teacher = databaseTeachers.find((item) => item.id === teacherId);
 
     setAccountForm((current) => ({
       ...current,
-      studentId,
-      name: student?.name ?? '',
-      identifier: student?.nisn ?? '',
-      email: student?.email ?? '',
-      classId: student?.classId ?? '',
+      referenceId: teacherId,
+      name: teacher?.name ?? '',
+      identifier: teacher?.nip ?? '',
+      email: teacher?.email ?? '',
+      subjectIds: teacher ? [...teacher.subjectIds] : [],
     }));
   };
 
-  const studentAccountReferenceIds = new Set(
-    accounts.filter((account) => account.role === 'siswa').map((account) => account.referenceId),
+  const teacherAccountReferenceIds = new Set(
+    accounts.filter((account) => account.role === 'guru').map((account) => account.referenceId),
   );
-  const studentsWithoutAccounts = databaseStudents.filter(
-    (student) => !student.userId && !studentAccountReferenceIds.has(student.id),
+  const teachersWithoutAccounts = databaseTeachers.filter(
+    (teacher) => !teacher.userId && !teacherAccountReferenceIds.has(teacher.id),
   );
-  const selectedAccountStudent = accountForm.studentId
-    ? databaseStudents.find((student) => student.id === accountForm.studentId)
+  const selectedAccountTeacher = accountForm.referenceId
+    ? databaseTeachers.find((teacher) => teacher.id === accountForm.referenceId)
     : undefined;
 
   const normalizedAccountSearch = accountSearch.trim().toLowerCase();
@@ -564,7 +572,10 @@ export function AdminMasterDataPage() {
       key: 'subjects',
       header: 'Mapel',
       render: (item) =>
-        item.subjectIds.map((subjectId) => databaseSubjects.find((subject) => subject.id === subjectId)?.shortName).join(', '),
+        item.subjectIds
+          .map((subjectId) => databaseSubjects.find((subject) => subject.id === subjectId)?.shortName)
+          .filter(Boolean)
+          .join(', ') || '-',
     },
     { key: 'email', header: 'Email', render: (item) => item.email },
     {
@@ -575,7 +586,7 @@ export function AdminMasterDataPage() {
         <div className="flex flex-nowrap gap-2">
           <button
             type="button"
-            onClick={() => setTeacherForm(item)}
+            onClick={() => setTeacherForm(toTeacherForm(item))}
             className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
           >
             Edit
@@ -752,14 +763,6 @@ export function AdminMasterDataPage() {
               <h2 className="text-xl font-bold text-slate-900">Buat Akun Role</h2>
               <Badge variant="blue">Supabase</Badge>
             </div>
-            {accountForm.role === 'siswa' ? (
-              <div className="mt-4">
-                <InfoAlert
-                  tone="info"
-                  message="Saat akun siswa disimpan, data profil siswa ikut dibuat otomatis. Cukup isi nama siswa, NISN, password, email, dan kelas di form ini."
-                />
-              </div>
-            ) : null}
             <div className="mt-5 grid gap-4 md:grid-cols-3">
               <select
                 value={accountForm.role}
@@ -767,11 +770,10 @@ export function AdminMasterDataPage() {
                   setAccountForm((current) => ({
                     ...current,
                     role: event.target.value as Role,
-                    studentId: '',
+                    referenceId: '',
                     name: '',
                     identifier: '',
                     email: '',
-                    classId: '',
                     employeeId: '',
                     subjectIds: [],
                   }))
@@ -784,16 +786,16 @@ export function AdminMasterDataPage() {
                   </option>
                 ))}
               </select>
-              {accountForm.role === 'siswa' && studentsWithoutAccounts.length > 0 ? (
+              {accountForm.role === 'guru' && teachersWithoutAccounts.length > 0 ? (
                 <select
-                  value={accountForm.studentId}
-                  onChange={(event) => handleAccountStudentSelect(event.target.value)}
+                  value={accountForm.referenceId}
+                  onChange={(event) => handleAccountTeacherSelect(event.target.value)}
                   className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none md:col-span-2"
                 >
-                  <option value="">Buat siswa baru dari form akun</option>
-                  {studentsWithoutAccounts.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name} - {student.nisn}
+                  <option value="">Buat guru baru dari form akun</option>
+                  {teachersWithoutAccounts.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.name} - {teacher.nip}
                     </option>
                   ))}
                 </select>
@@ -801,14 +803,14 @@ export function AdminMasterDataPage() {
               <input
                 value={accountForm.name}
                 onChange={(event) => setAccountForm((current) => ({ ...current, name: event.target.value }))}
-                disabled={Boolean(selectedAccountStudent)}
+                disabled={Boolean(selectedAccountTeacher)}
                 className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                 placeholder={accountForm.role === 'siswa' ? 'Nama siswa' : 'Nama akun'}
               />
               <input
                 value={accountForm.identifier}
                 onChange={(event) => setAccountForm((current) => ({ ...current, identifier: event.target.value }))}
-                disabled={Boolean(selectedAccountStudent)}
+                disabled={Boolean(selectedAccountTeacher)}
                 className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                 placeholder={accountForm.role === 'siswa' ? 'NISN' : 'NIP/username'}
               />
@@ -823,25 +825,10 @@ export function AdminMasterDataPage() {
                 type="email"
                 value={accountForm.email}
                 onChange={(event) => setAccountForm((current) => ({ ...current, email: event.target.value }))}
-                disabled={Boolean(selectedAccountStudent)}
+                disabled={Boolean(selectedAccountTeacher)}
                 className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                 placeholder={accountForm.role === 'siswa' ? 'Email siswa' : 'Email'}
               />
-              {accountForm.role === 'siswa' ? (
-                <select
-                  value={accountForm.classId}
-                  onChange={(event) => setAccountForm((current) => ({ ...current, classId: event.target.value }))}
-                  disabled={Boolean(selectedAccountStudent)}
-                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                >
-                  <option value="">Pilih kelas siswa</option>
-                  {databaseClasses.map((classItem) => (
-                    <option key={classItem.id} value={classItem.id}>
-                      {classItem.name}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
               {accountForm.role === 'kurikulum' ? (
                 <input
                   value={accountForm.employeeId}
@@ -856,13 +843,16 @@ export function AdminMasterDataPage() {
                 {databaseSubjects.map((subject) => (
                   <label
                     key={subject.id}
-                    className="flex items-center gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm font-medium text-slate-700"
+                    className={`flex items-center gap-3 rounded-2xl border border-brand-100 px-4 py-3 text-sm font-medium text-slate-700 ${
+                      selectedAccountTeacher ? 'bg-slate-100 text-slate-500' : 'bg-brand-50/50'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={accountForm.subjectIds.includes(subject.id)}
+                      disabled={Boolean(selectedAccountTeacher)}
                       onChange={() => toggleAccountSubject(subject.id)}
-                      className="h-4 w-4 accent-brand-600"
+                      className="h-4 w-4 accent-brand-600 disabled:cursor-not-allowed"
                     />
                     <span>{subject.name}</span>
                   </label>
@@ -878,7 +868,7 @@ export function AdminMasterDataPage() {
                 {isAccountSubmitting
                   ? 'Menyimpan...'
                   : accountForm.role === 'siswa'
-                    ? 'Simpan Akun & Data Siswa'
+                    ? 'Simpan Akun Siswa'
                     : 'Simpan Akun'}
               </button>
               <button
@@ -950,6 +940,21 @@ export function AdminMasterDataPage() {
               <h2 className="text-xl font-bold text-slate-900">{teacherForm.id ? 'Edit Guru' : 'Tambah Guru'}</h2>
               {teacherForm.id ? <Badge variant="yellow">Mode edit</Badge> : null}
             </div>
+            <label className="mt-5 block space-y-2 text-sm font-medium text-slate-700">
+              <span>Pilih Guru dari Data Guru</span>
+              <select
+                value={teacherForm.id}
+                onChange={(event) => handleTeacherSelect(event.target.value)}
+                className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+              >
+                <option value="">Tambah guru baru / pilih guru yang akan diberi mapel</option>
+                {databaseTeachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name} - {teacher.nip}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
               <input
                 value={teacherForm.name}

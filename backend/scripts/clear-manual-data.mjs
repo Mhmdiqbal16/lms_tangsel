@@ -55,6 +55,7 @@ const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 const deleteSteps = [
+  ['assessment_student_answers', 'assessment_id'],
   ['assessment_student_statuses', 'assessment_id'],
   ['assessment_questions', 'id'],
   ['assessments', 'id'],
