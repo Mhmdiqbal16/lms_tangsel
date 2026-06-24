@@ -251,6 +251,8 @@ Table teacher_questionnaires {
   schedule_id text [not null]
   date date [not null]
   completed boolean [not null]
+  ratings jsonb [not null]
+  note text [not null]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 

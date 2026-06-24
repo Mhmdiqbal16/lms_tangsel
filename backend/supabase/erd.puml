@@ -227,6 +227,8 @@ entity "teacher_questionnaires" as teacher_questionnaires {
   * schedule_id : text <<FK, UK student_teacher_schedule_date>>
   * date : date <<UK student_teacher_schedule_date>>
   * completed : boolean
+  * ratings : jsonb
+  * note : text
   * created_at : timestamptz
   * updated_at : timestamptz
 }

@@ -3,7 +3,6 @@ import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, TableColumn } from '@/components/tables/DataTable';
-import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
 import { StudentAttendance } from '@/types';
@@ -26,35 +25,31 @@ export function SiswaAbsensiPage() {
   const { students, studentAttendances, schedules, subjects, teachers } = useAppData();
   const student = students.find((item) => item.id === session?.referenceId);
   const [subjectFilter, setSubjectFilter] = useState('all');
-  const [monthFilter, setMonthFilter] = useState(getMonthKey(academicDateReference));
+  const [monthFilter, setMonthFilter] = useState('all');
 
-  const rows: AttendanceRow[] =
-    studentAttendances
-      .filter((item) => item.studentId === student?.id)
-      .map((item) => {
-        const schedule = schedules.find((scheduleItem) => scheduleItem.id === item.scheduleId);
-        const subject = subjects.find((subjectItem) => subjectItem.id === schedule?.subjectId);
-        const teacher = teachers.find((teacherItem) => teacherItem.id === schedule?.teacherId);
-
-        return {
-          ...item,
-          subjectName: subject?.name ?? '-',
-          teacherName: teacher?.name ?? '-',
-          timeRange: schedule ? `${schedule.startTime} - ${schedule.endTime}` : '-',
-        };
-      })
-      .filter((item) => (subjectFilter === 'all' ? true : item.subjectName === subjectFilter))
-      .filter((item) => getMonthKey(item.date) === monthFilter) ?? [];
-
-  const subjectOptions = Array.from(new Set(studentAttendances
+  const rawRows: AttendanceRow[] = studentAttendances
     .filter((item) => item.studentId === student?.id)
     .map((item) => {
       const schedule = schedules.find((scheduleItem) => scheduleItem.id === item.scheduleId);
-      return subjects.find((subjectItem) => subjectItem.id === schedule?.subjectId)?.name ?? '-';
-    })));
+      const subject = subjects.find((subjectItem) => subjectItem.id === schedule?.subjectId);
+      const teacher = teachers.find((teacherItem) => teacherItem.id === schedule?.teacherId);
 
-  const monthOptions = Array.from(
-    new Set(studentAttendances.filter((item) => item.studentId === student?.id).map((item) => getMonthKey(item.date))),
+      return {
+        ...item,
+        subjectName: subject?.name ?? 'Jadwal tidak ditemukan',
+        teacherName: teacher?.name ?? '-',
+        timeRange: schedule ? `${schedule.startTime} - ${schedule.endTime}` : '-',
+      };
+    })
+    .sort((first, second) => second.date.localeCompare(first.date));
+
+  const rows = rawRows
+    .filter((item) => (subjectFilter === 'all' ? true : item.subjectName === subjectFilter))
+    .filter((item) => (monthFilter === 'all' ? true : getMonthKey(item.date) === monthFilter));
+
+  const subjectOptions = Array.from(new Set(rawRows.map((item) => item.subjectName)));
+  const monthOptions = Array.from(new Set(rawRows.map((item) => getMonthKey(item.date)))).sort((first, second) =>
+    second.localeCompare(first),
   );
 
   const columns: TableColumn<AttendanceRow>[] = [
@@ -100,6 +95,7 @@ export function SiswaAbsensiPage() {
             onChange={(event) => setMonthFilter(event.target.value)}
             className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
           >
+            <option value="all">Semua bulan</option>
             {monthOptions.map((monthKey) => (
               <option key={monthKey} value={monthKey}>
                 {formatMonthYear(`${monthKey}-01`)}
@@ -125,4 +121,3 @@ export function SiswaAbsensiPage() {
     </div>
   );
 }
-

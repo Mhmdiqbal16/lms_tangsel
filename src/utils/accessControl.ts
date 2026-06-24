@@ -17,6 +17,7 @@ export const permissionsByRole: Record<Role, Permission[]> = {
     'learning.material.create',
     'student.journal.view_taught_classes',
     'assessment.manage',
+    'assessment.result.view_taught_classes',
     'teaching.history.view_own',
     'account.view_own',
   ],
@@ -25,9 +26,10 @@ export const permissionsByRole: Record<Role, Permission[]> = {
     'teacher.attendance.monitor',
     'learning.material.monitor',
     'student.journal.monitor',
-    'assessment.result.view',
+    'questionnaire.result.view',
     'report.view',
     'validation.manage',
+    'account.view_own',
   ],
   admin: ['admin.dashboard.view', 'master.data.manage'],
 };
@@ -41,13 +43,15 @@ const accessHighlightsByRole: Record<Role, string[]> = {
   guru: [
     'Mengisi presensi mengajar sesuai jadwal dan akun guru yang aktif.',
     'Mengisi absensi siswa untuk kelas yang sedang diajar dengan status hadir, izin, atau alfa.',
-    'Menginput materi, assessment, dan melihat jurnal siswa pada kelas yang diajar.',
+    'Menginput materi, assessment, serta melihat hasil pretest dan posttest pada kelas yang diajar.',
+    'Melihat jurnal siswa pada kelas dan mata pelajaran yang diajar.',
     'Melihat riwayat mengajar dan profil pribadi tanpa membuka data guru lain.',
   ],
   kurikulum: [
-    'Memantau dashboard monitoring, kehadiran guru, dan jurnal siswa lintas kelas.',
+    'Memantau dashboard monitoring, kehadiran guru, jurnal siswa, dan hasil kuisioner lintas kelas.',
     'Melihat laporan pembelajaran dan monitoring materi guru.',
     'Memvalidasi jurnal siswa serta materi guru sebagai bagian kontrol akademik.',
+    'Melihat profil pribadi tanpa akses mengubah data akun.',
   ],
   admin: [
     'Melihat dashboard administrasi sistem yang aktif.',

@@ -729,6 +729,8 @@ export const questionnaires: TeacherQuestionnaire[] = [
     scheduleId: class1OneDayPrimary.id,
     date: oneDayAgoISO,
     completed: true,
+    ratings: { clarity: 5, interaction: 4, discipline: 5, support: 4 },
+    note: 'Guru menjelaskan materi dengan jelas dan memberi kesempatan bertanya.',
   },
   {
     id: 'kui-2',
@@ -737,6 +739,8 @@ export const questionnaires: TeacherQuestionnaire[] = [
     scheduleId: class1TodayPrimary.id,
     date: todayISO,
     completed: false,
+    ratings: {},
+    note: '',
   },
   {
     id: 'kui-3',
@@ -745,6 +749,8 @@ export const questionnaires: TeacherQuestionnaire[] = [
     scheduleId: class1TodayPrimary.id,
     date: todayISO,
     completed: true,
+    ratings: { clarity: 4, interaction: 4, discipline: 5, support: 5 },
+    note: 'Pembelajaran berjalan baik dan guru membantu saat latihan.',
   },
   {
     id: 'kui-4',
@@ -753,6 +759,8 @@ export const questionnaires: TeacherQuestionnaire[] = [
     scheduleId: class1TwoDaysPrimary.id,
     date: twoDaysAgoISO,
     completed: true,
+    ratings: { clarity: 4, interaction: 5, discipline: 4, support: 4 },
+    note: 'Diskusi kelas membantu memahami materi.',
   },
 ];
 

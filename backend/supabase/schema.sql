@@ -218,6 +218,8 @@ create table if not exists teacher_questionnaires (
   schedule_id text not null references schedules(id) on delete restrict,
   date date not null,
   completed boolean not null default false,
+  ratings jsonb not null default '{}'::jsonb,
+  note text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (student_id, teacher_id, schedule_id, date)

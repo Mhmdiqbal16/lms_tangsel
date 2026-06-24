@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import {
   listAssessments,
   listClasses,
+  listCurricula,
   listLearningMaterials,
   listSchedules,
   listStudentAttendances,
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
   const [
     students,
     teachers,
+    curricula,
     classes,
     subjects,
     schedules,
@@ -37,6 +39,7 @@ export async function GET(request: NextRequest) {
   ] = await Promise.all([
     listStudents(),
     listTeachers(),
+    listCurricula(),
     listClasses(),
     listSubjects(),
     listSchedules(),
@@ -52,7 +55,7 @@ export async function GET(request: NextRequest) {
     users: [],
     students,
     teachers,
-    curricula: [],
+    curricula,
     admins: [],
     classes,
     subjects,

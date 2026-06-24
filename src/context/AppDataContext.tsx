@@ -10,6 +10,7 @@ import {
   ClassRoom,
   LearningMaterial,
   Permission,
+  QuestionnaireRatings,
   Schedule,
   StudentAttendance,
   StudentAttendanceStatus,
@@ -172,8 +173,8 @@ interface AppDataContextValue extends AppDataState {
   notifications: typeof mockData.notifications;
   reportSummary: typeof mockData.reportSummary;
   addStudentJournal: (payload: AddJournalPayload) => Promise<ActionResult>;
-  addTeacherAttendance: (payload: AddTeacherAttendancePayload) => ActionResult;
-  saveStudentAttendances: (payload: SaveStudentAttendancesPayload) => ActionResult;
+  addTeacherAttendance: (payload: AddTeacherAttendancePayload) => Promise<ActionResult>;
+  saveStudentAttendances: (payload: SaveStudentAttendancesPayload) => Promise<ActionResult>;
   addLearningMaterial: (payload: AddLearningMaterialPayload) => Promise<ActionResult>;
   addAssessmentBundle: (payload: AddAssessmentBundlePayload) => Promise<ActionResult>;
   completeAssessment: (
@@ -186,6 +187,8 @@ interface AppDataContextValue extends AppDataState {
     teacherId: string;
     scheduleId: string;
     date: string;
+    ratings: QuestionnaireRatings;
+    note?: string;
   }) => Promise<ActionResult>;
   setJournalValidation: (journalId: string, status: ValidationStatus) => Promise<ActionResult>;
   setMaterialValidation: (materialId: string, status: ValidationStatus) => Promise<ActionResult>;
@@ -272,7 +275,7 @@ function findProfileUser(users: User[], role: User['role'], referenceId: string,
 }
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
-  const { session, hasPermission, updateSessionProfile } = useAuthContext();
+  const { session, hasPermission } = useAuthContext();
   const [state, setState] = useState<AppDataState>(() => readStoredAppState());
 
   useEffect(() => {
@@ -318,14 +321,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   const getMasterDataAccessError = () =>
     getAccessError('master.data.manage', 'Akun aktif tidak memiliki akses mengelola data master.');
-
-  const syncActiveSession = (referenceId: string, name: string, identifier?: string) => {
-    if (session?.referenceId !== referenceId) {
-      return;
-    }
-
-    updateSessionProfile(identifier ? { name, identifier } : { name });
-  };
 
   const value: AppDataContextValue = {
     ...state,
@@ -402,7 +397,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         return getApiActionError(error, 'Jurnal gagal disimpan.');
       }
     },
-    addTeacherAttendance: (payload) => {
+    addTeacherAttendance: async (payload) => {
       const accessError = getAccessError(
         'teacher.attendance.create',
         'Akun aktif tidak memiliki akses mengisi presensi guru.',
@@ -434,22 +429,26 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const nextAttendance: TeacherAttendance = {
-        id: createId('pres'),
-        ...payload,
-      };
+      try {
+        const savedAttendance = await apiRequest<TeacherAttendance>('/api/teacher/teacher-attendances', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
 
-      setState((current) => ({
-        ...current,
-        teacherAttendances: [nextAttendance, ...current.teacherAttendances],
-      }));
+        setState((current) => ({
+          ...current,
+          teacherAttendances: upsertById(current.teacherAttendances, savedAttendance),
+        }));
 
-      return {
-        success: true,
-        message: 'Presensi mengajar berhasil disimpan.',
-      };
+        return {
+          success: true,
+          message: 'Presensi mengajar berhasil disimpan.',
+        };
+      } catch (error) {
+        return getApiActionError(error, 'Presensi mengajar gagal disimpan.');
+      }
     },
-    saveStudentAttendances: (payload) => {
+    saveStudentAttendances: async (payload) => {
       const accessError = getAccessError(
         'student.attendance.manage_taught_classes',
         'Akun aktif tidak memiliki akses mengelola absensi siswa.',
@@ -518,44 +517,44 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      setState((current) => {
-        const nextAttendances = [...current.studentAttendances];
+      try {
+        const savedAttendances = await apiRequest<StudentAttendance[]>('/api/teacher/student-attendances', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
 
-        payload.attendances.forEach((attendance) => {
-          const existingIndex = nextAttendances.findIndex(
-            (item) =>
-              item.studentId === attendance.studentId &&
-              item.scheduleId === payload.scheduleId &&
-              item.date === payload.date,
-          );
+        setState((current) => {
+          let nextAttendances = [...current.studentAttendances];
 
-          if (existingIndex >= 0) {
-            nextAttendances[existingIndex] = {
-              ...nextAttendances[existingIndex],
-              status: attendance.status,
-            };
-            return;
-          }
+          savedAttendances.forEach((attendance) => {
+            const existingIndex = nextAttendances.findIndex(
+              (item) =>
+                item.studentId === attendance.studentId &&
+                item.scheduleId === attendance.scheduleId &&
+                item.date === attendance.date,
+            );
 
-          nextAttendances.unshift({
-            id: createId('atts'),
-            studentId: attendance.studentId,
-            scheduleId: payload.scheduleId,
-            date: payload.date,
-            status: attendance.status,
-          } satisfies StudentAttendance);
+            if (existingIndex >= 0) {
+              nextAttendances = nextAttendances.map((item, index) => (index === existingIndex ? attendance : item));
+              return;
+            }
+
+            nextAttendances = [attendance, ...nextAttendances];
+          });
+
+          return {
+            ...current,
+            studentAttendances: nextAttendances,
+          };
         });
 
         return {
-          ...current,
-          studentAttendances: nextAttendances,
+          success: true,
+          message: 'Absensi siswa berhasil disimpan.',
         };
-      });
-
-      return {
-        success: true,
-        message: 'Absensi siswa berhasil disimpan.',
-      };
+      } catch (error) {
+        return getApiActionError(error, 'Absensi siswa gagal disimpan.');
+      }
     },
     addLearningMaterial: async (payload) => {
       const accessError = getAccessError(
@@ -717,7 +716,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         return getApiActionError(error, 'Assessment gagal ditandai selesai.');
       }
     },
-    completeQuestionnaire: async ({ studentId, teacherId, scheduleId, date }) => {
+    completeQuestionnaire: async ({ studentId, teacherId, scheduleId, date, ratings, note }) => {
       if (!session || session.role !== 'siswa' || session.referenceId !== studentId) {
         return {
           success: false,
@@ -728,7 +727,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       try {
         const savedQuestionnaire = await apiRequest<TeacherQuestionnaire>('/api/student/questionnaires', {
           method: 'POST',
-          body: JSON.stringify({ studentId, teacherId, scheduleId, date }),
+          body: JSON.stringify({ studentId, teacherId, scheduleId, date, ratings, note }),
         });
 
         setState((current) => ({
@@ -837,6 +836,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       }
     },
     updateOwnPassword: (payload) => {
+      void payload;
+
       if (!session) {
         return {
           success: false,
@@ -844,163 +845,25 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const user =
-        state.users.find((item) => item.id === session.userId) ??
-        state.users.find((item) => item.role === session.role && item.referenceId === session.referenceId);
-
-      if (!user) {
-        return {
-          success: false,
-          message: 'Akun pengguna tidak ditemukan pada data sistem.',
-        };
-      }
-
-      if (user.password !== payload.currentPassword) {
-        return {
-          success: false,
-          message: 'Password lama tidak sesuai.',
-        };
-      }
-
-      if (payload.newPassword.trim().length < 6) {
-        return {
-          success: false,
-          message: 'Password baru minimal 6 karakter.',
-        };
-      }
-
-      setState((current) => ({
-        ...current,
-        users: current.users.map((item) =>
-          item.id === user.id ? { ...item, password: payload.newPassword.trim() } : item,
-        ),
-      }));
-
       return {
-        success: true,
-        message: 'Password berhasil diperbarui. Gunakan password baru saat login berikutnya.',
+        success: false,
+        message: 'Password hanya dapat diubah oleh admin melalui menu Data Master.',
       };
     },
     updateStudentAccount: (payload) => {
-      const accessError = getAccessError('account.view_own', 'Akun aktif tidak memiliki akses mengubah profil siswa.');
-      if (accessError) {
-        return accessError;
-      }
-
-      if (!session || session.role !== 'siswa' || session.referenceId !== payload.studentId) {
-        return {
-          success: false,
-          message: 'Siswa hanya dapat mengubah profil akun miliknya sendiri.',
-        };
-      }
-
-      const existingStudent = state.students.find((item) => item.id === payload.studentId);
-      const name = payload.name.trim();
-      const email = payload.email.trim();
-
-      if (!existingStudent || !name || !email) {
-        return {
-          success: false,
-          message: 'Nama dan email siswa wajib diisi.',
-        };
-      }
-
-      if (!isValidEmail(email)) {
-        return {
-          success: false,
-          message: 'Format email siswa tidak valid.',
-        };
-      }
-
-      const nextStudent: StudentProfile = {
-        ...existingStudent,
-        name,
-        email,
-        avatar: normalizeAvatar(payload.avatar, name),
-      };
-
-      setState((current) => {
-        const user = findProfileUser(current.users, 'siswa', nextStudent.id, nextStudent.userId);
-
-        return {
-          ...current,
-          students: current.students.map((item) => (item.id === nextStudent.id ? nextStudent : item)),
-          users: user
-            ? current.users.map((item) => (item.id === user.id ? { ...item, name } : item))
-            : current.users,
-        };
-      });
-
-      syncActiveSession(nextStudent.id, name);
+      void payload;
 
       return {
-        success: true,
-        message: 'Profil siswa berhasil diperbarui.',
+        success: false,
+        message: 'Profil siswa hanya dapat diubah oleh admin melalui menu Data Master.',
       };
     },
     updateTeacherProfile: (payload) => {
-      const accessError = getAccessError('account.view_own', 'Akun aktif tidak memiliki akses mengubah profil guru.');
-      if (accessError) {
-        return accessError;
-      }
-
-      if (!session || session.role !== 'guru' || session.referenceId !== payload.teacherId) {
-        return {
-          success: false,
-          message: 'Guru hanya dapat mengubah profil akun miliknya sendiri.',
-        };
-      }
-
-      const existingTeacher = state.teachers.find((item) => item.id === payload.teacherId);
-      const name = payload.name.trim();
-      const email = payload.email.trim();
-      const subjectIds = Array.from(new Set(payload.subjectIds));
-
-      if (!existingTeacher || !name || !email || subjectIds.length === 0) {
-        return {
-          success: false,
-          message: 'Nama, email, dan minimal satu mata pelajaran wajib diisi.',
-        };
-      }
-
-      if (!isValidEmail(email)) {
-        return {
-          success: false,
-          message: 'Format email guru tidak valid.',
-        };
-      }
-
-      if (subjectIds.some((subjectId) => !state.subjects.some((subject) => subject.id === subjectId))) {
-        return {
-          success: false,
-          message: 'Terdapat mata pelajaran yang tidak tersedia pada data master.',
-        };
-      }
-
-      const nextTeacher: TeacherProfile = {
-        ...existingTeacher,
-        name,
-        email,
-        subjectIds,
-      };
-
-      setState((current) => {
-        const user = findProfileUser(current.users, 'guru', nextTeacher.id, nextTeacher.userId);
-
-        return {
-          ...current,
-          teachers: current.teachers.map((item) => (item.id === nextTeacher.id ? nextTeacher : item)),
-          users: user
-            ? current.users.map((item) => (item.id === user.id ? { ...item, name } : item))
-            : current.users,
-        };
-      });
-
-      syncActiveSession(nextTeacher.id, name);
+      void payload;
 
       return {
-        success: true,
-        message: 'Profil guru berhasil diperbarui.',
+        success: false,
+        message: 'Profil guru hanya dapat diubah oleh admin melalui menu Data Master.',
       };
     },
     saveStudentByAdmin: (payload) => {

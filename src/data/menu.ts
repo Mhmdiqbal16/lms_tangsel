@@ -59,6 +59,12 @@ export const menusByRole: Record<Role, MenuItem[]> = {
       permission: 'student.journal.view_taught_classes',
     },
     {
+      label: 'Hasil Test',
+      path: '/guru/hasil-test',
+      icon: BookOpenCheck,
+      permission: 'assessment.result.view_taught_classes',
+    },
+    {
       label: 'Riwayat Mengajar',
       path: '/guru/riwayat',
       icon: ClipboardList,
@@ -92,13 +98,14 @@ export const menusByRole: Record<Role, MenuItem[]> = {
       permission: 'student.journal.monitor',
     },
     {
-      label: 'Hasil Posttest',
-      path: '/kurikulum/hasil-posttest',
-      icon: BookOpenCheck,
-      permission: 'assessment.result.view',
+      label: 'Hasil Kuisioner',
+      path: '/kurikulum/hasil-kuisioner',
+      icon: BarChart3,
+      permission: 'questionnaire.result.view',
     },
     { label: 'Laporan', path: '/kurikulum/laporan', icon: FileBarChart2, permission: 'report.view' },
     { label: 'Validasi Data', path: '/kurikulum/validasi', icon: FileCheck2, permission: 'validation.manage' },
+    { label: 'Profil', path: '/kurikulum/profil', icon: UserCircle2, permission: 'account.view_own' },
   ],
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: ShieldCheck, permission: 'admin.dashboard.view' },

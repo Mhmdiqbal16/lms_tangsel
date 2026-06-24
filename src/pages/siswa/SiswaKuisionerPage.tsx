@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
+import type { QuestionnaireRatings } from '@/types';
 import { formatDateID, formatDayName } from '@/utils/date';
 import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
 
@@ -103,11 +104,16 @@ export function SiswaKuisionerPage() {
     }
 
     setPendingKey(selectedSession.key);
+    const ratings = Object.fromEntries(
+      questionnaireItems.map((item) => [item.id, Number(form.ratings[item.id])]),
+    ) as QuestionnaireRatings;
     const result = await completeQuestionnaire({
       studentId: student.id,
       teacherId: selectedSession.schedule.teacherId,
       scheduleId: selectedSession.schedule.id,
       date: selectedSession.sessionDate,
+      ratings,
+      note: form.note,
     });
     setPendingKey(null);
     setMessage({ tone: result.success ? 'success' : 'warning', text: result.message });

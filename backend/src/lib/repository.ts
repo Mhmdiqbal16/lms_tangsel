@@ -29,6 +29,7 @@ import type {
   ClassRoom,
   Curriculum,
   LearningMaterial,
+  QuestionnaireRatings,
   Schedule,
   Student,
   StudentAttendance,
@@ -181,6 +182,8 @@ type TeacherQuestionnaireRow = {
   schedule_id: string;
   date: string;
   completed: boolean;
+  ratings?: Partial<QuestionnaireRatings> | null;
+  note?: string | null;
 };
 
 type StudentJournalRow = {
@@ -492,6 +495,8 @@ function toTeacherQuestionnaire(row: TeacherQuestionnaireRow): TeacherQuestionna
     scheduleId: row.schedule_id,
     date: row.date,
     completed: row.completed,
+    ratings: row.ratings ?? undefined,
+    note: row.note ?? '',
   };
 }
 
@@ -528,6 +533,18 @@ function isMissingSupabaseTable(error: SupabaseRepositoryError | null, tableName
   return (
     errorText.includes(tableName) &&
     (error.code === 'PGRST205' || errorText.includes('schema cache') || errorText.includes('does not exist'))
+  );
+}
+
+function isMissingSupabaseColumn(error: SupabaseRepositoryError | null, columnName: string) {
+  if (!error) {
+    return false;
+  }
+
+  const errorText = `${error.message} ${error.details ?? ''}`;
+  return (
+    errorText.includes(columnName) &&
+    (error.code === 'PGRST204' || errorText.includes('schema cache') || errorText.includes('column'))
   );
 }
 
@@ -1208,6 +1225,17 @@ export async function listTeachers() {
       return toTeacher(teacher, await getTeacherSubjectIds(teacher.id));
     }),
   );
+}
+
+export async function listCurricula() {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return [...mockCurricula].sort((first, second) => first.name.localeCompare(second.name));
+  }
+
+  const { data, error } = await supabase.from('curricula').select('*').order('name', { ascending: true });
+  throwSupabaseError('Gagal mengambil daftar kurikulum', error);
+  return (data ?? []).map((row) => toCurriculum(row as CurriculumRow));
 }
 
 export async function saveTeacher(input: SaveTeacherInput) {
@@ -2222,6 +2250,8 @@ export async function completeTeacherQuestionnaire(questionnaire: TeacherQuestio
       mockQuestionnaires[existingIndex] = {
         ...mockQuestionnaires[existingIndex],
         completed: true,
+        ratings: questionnaire.ratings,
+        note: questionnaire.note ?? '',
       };
       return mockQuestionnaires[existingIndex];
     }
@@ -2240,10 +2270,26 @@ export async function completeTeacherQuestionnaire(questionnaire: TeacherQuestio
   if (existing) {
     const { data, error } = await supabase
       .from('teacher_questionnaires')
-      .update({ completed: true })
+      .update({ completed: true, ratings: questionnaire.ratings ?? {}, note: questionnaire.note ?? '' })
       .eq('id', existing.id)
       .select()
       .single();
+
+    if (isMissingSupabaseColumn(error, 'ratings') || isMissingSupabaseColumn(error, 'note')) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('teacher_questionnaires')
+        .update({ completed: true })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      throwSupabaseError('Gagal memperbarui kuisioner guru', fallbackError);
+      return {
+        ...toTeacherQuestionnaire(fallbackData as TeacherQuestionnaireRow),
+        ratings: questionnaire.ratings,
+        note: questionnaire.note ?? '',
+      };
+    }
 
     throwSupabaseError('Gagal memperbarui kuisioner guru', error);
     return toTeacherQuestionnaire(data as TeacherQuestionnaireRow);
@@ -2258,9 +2304,33 @@ export async function completeTeacherQuestionnaire(questionnaire: TeacherQuestio
       schedule_id: questionnaire.scheduleId,
       date: questionnaire.date,
       completed: true,
+      ratings: questionnaire.ratings ?? {},
+      note: questionnaire.note ?? '',
     })
     .select()
     .single();
+
+  if (isMissingSupabaseColumn(error, 'ratings') || isMissingSupabaseColumn(error, 'note')) {
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('teacher_questionnaires')
+      .insert({
+        id: questionnaire.id,
+        student_id: questionnaire.studentId,
+        teacher_id: questionnaire.teacherId,
+        schedule_id: questionnaire.scheduleId,
+        date: questionnaire.date,
+        completed: true,
+      })
+      .select()
+      .single();
+
+    throwSupabaseError('Gagal menyimpan kuisioner guru', fallbackError);
+    return {
+      ...toTeacherQuestionnaire(fallbackData as TeacherQuestionnaireRow),
+      ratings: questionnaire.ratings,
+      note: questionnaire.note ?? '',
+    };
+  }
 
   throwSupabaseError('Gagal menyimpan kuisioner guru', error);
   return toTeacherQuestionnaire(data as TeacherQuestionnaireRow);

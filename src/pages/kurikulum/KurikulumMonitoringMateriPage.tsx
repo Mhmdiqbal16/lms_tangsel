@@ -24,18 +24,40 @@ export function KurikulumMonitoringMateriPage() {
   const [classFilter, setClassFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  const baseRows: MaterialMonitoringRow[] = teacherAttendances
-    .map((attendance) => {
-      const schedule = schedules.find((item) => item.id === attendance.scheduleId);
+  const teachingSessions = new Map<string, { scheduleId: string; date: string; teacherId: string }>();
+
+  teacherAttendances.forEach((attendance) => {
+    teachingSessions.set(`${attendance.scheduleId}-${attendance.date}`, {
+      scheduleId: attendance.scheduleId,
+      date: attendance.date,
+      teacherId: attendance.teacherId,
+    });
+  });
+
+  learningMaterials.forEach((material) => {
+    const schedule = schedules.find((item) => item.id === material.scheduleId);
+    teachingSessions.set(`${material.scheduleId}-${material.date}`, {
+      scheduleId: material.scheduleId,
+      date: material.date,
+      teacherId: material.teacherId || schedule?.teacherId || '',
+    });
+  });
+
+  const baseRows: MaterialMonitoringRow[] = Array.from(teachingSessions.values())
+    .map((session) => {
+      const schedule = schedules.find((item) => item.id === session.scheduleId);
+      const attendance = teacherAttendances.find(
+        (item) => item.scheduleId === session.scheduleId && item.date === session.date,
+      );
       const material = learningMaterials.find(
-        (item) => item.scheduleId === attendance.scheduleId && item.date === attendance.date,
+        (item) => item.scheduleId === session.scheduleId && item.date === session.date,
       );
       return {
-        id: attendance.id,
-        teacherName: teachers.find((item) => item.id === attendance.teacherId)?.name ?? '-',
+        id: `${session.scheduleId}-${session.date}`,
+        teacherName: teachers.find((item) => item.id === (material?.teacherId ?? attendance?.teacherId ?? session.teacherId))?.name ?? '-',
         className: classes.find((item) => item.id === schedule?.classId)?.name ?? '-',
         subject: subjects.find((item) => item.id === schedule?.subjectId)?.name ?? '-',
-        date: attendance.date,
+        date: session.date,
         meeting: material ? `Pertemuan ${material.meeting}` : '-',
         material: material?.title ?? 'Belum diisi',
         alignment: material?.alignmentStatus ?? 'Belum Diisi',

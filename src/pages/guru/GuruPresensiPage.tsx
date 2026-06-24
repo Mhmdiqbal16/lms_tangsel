@@ -41,6 +41,8 @@ export function GuruPresensiPage() {
   const [notes, setNotes] = useState('');
   const [studentStatuses, setStudentStatuses] = useState<Record<string, StudentAttendanceStatus>>({});
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  const [isSavingTeacherAttendance, setIsSavingTeacherAttendance] = useState(false);
+  const [isSavingStudentAttendances, setIsSavingStudentAttendances] = useState(false);
 
   if (!teacher) {
     return null;
@@ -102,7 +104,7 @@ export function GuruPresensiPage() {
   const izinCount = classStudents.filter((student) => studentStatuses[student.id] === 'Izin').length;
   const alfaCount = classStudents.filter((student) => studentStatuses[student.id] === 'Alfa').length;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!activeScheduleId) {
@@ -110,13 +112,14 @@ export function GuruPresensiPage() {
       return;
     }
 
-    const result = addTeacherAttendance({
+    setIsSavingTeacherAttendance(true);
+    const result = await addTeacherAttendance({
       teacherId: teacher.id,
       scheduleId: activeScheduleId,
       date: academicDateReference,
       status,
       notes,
-    });
+    }).finally(() => setIsSavingTeacherAttendance(false));
 
     setMessage({ tone: result.success ? 'success' : 'warning', text: result.message });
     if (result.success) {
@@ -124,7 +127,7 @@ export function GuruPresensiPage() {
     }
   };
 
-  const handleStudentAttendanceSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleStudentAttendanceSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!activeSchedule) {
@@ -132,7 +135,8 @@ export function GuruPresensiPage() {
       return;
     }
 
-    const result = saveStudentAttendances({
+    setIsSavingStudentAttendances(true);
+    const result = await saveStudentAttendances({
       teacherId: teacher.id,
       scheduleId: activeSchedule.id,
       date: academicDateReference,
@@ -140,7 +144,7 @@ export function GuruPresensiPage() {
         studentId: student.id,
         status: studentStatuses[student.id] ?? 'Hadir',
       })),
-    });
+    }).finally(() => setIsSavingStudentAttendances(false));
 
     setMessage({ tone: result.success ? 'success' : 'warning', text: result.message });
   };
@@ -278,9 +282,10 @@ export function GuruPresensiPage() {
 
             <button
               type="submit"
-              className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700"
+              disabled={isSavingTeacherAttendance}
+              className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Simpan Presensi Guru
+              {isSavingTeacherAttendance ? 'Menyimpan...' : 'Simpan Presensi Guru'}
             </button>
           </form>
         </section>
@@ -409,10 +414,10 @@ export function GuruPresensiPage() {
 
             <button
               type="submit"
-              disabled={!canManageStudentAttendances || classStudents.length === 0}
+              disabled={!canManageStudentAttendances || classStudents.length === 0 || isSavingStudentAttendances}
               className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Simpan Absensi Siswa
+              {isSavingStudentAttendances ? 'Menyimpan...' : 'Simpan Absensi Siswa'}
             </button>
           </form>
         ) : null}

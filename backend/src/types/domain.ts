@@ -12,6 +12,10 @@ export type AssessmentType = 'pretest' | 'posttest';
 
 export type ActiveStatus = 'Aktif' | 'Nonaktif';
 
+export type QuestionnaireRatingKey = 'clarity' | 'interaction' | 'discipline' | 'support';
+
+export type QuestionnaireRatings = Record<QuestionnaireRatingKey, number>;
+
 export type User = {
   id: string;
   role: UserRole;
@@ -151,6 +155,8 @@ export type TeacherQuestionnaire = {
   scheduleId: string;
   date: string;
   completed: boolean;
+  ratings?: Partial<QuestionnaireRatings>;
+  note?: string;
 };
 
 export type StudentJournal = {

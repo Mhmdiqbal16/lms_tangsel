@@ -11,8 +11,10 @@ import { BookOpenText, ClipboardCheck, NotebookPen } from 'lucide-react';
 interface TeacherReportRow {
   id: string;
   teacherName: string;
+  totalSesi: number;
   totalPresensi: number;
   hadir: number;
+  belumPresensi: number;
 }
 
 interface ActivityReportRow {
@@ -35,12 +37,41 @@ export function KurikulumLaporanPage() {
   const [activeReport, setActiveReport] = useState<'teachers' | 'activities' | 'journals'>('teachers');
   const [reportSearch, setReportSearch] = useState('');
 
-  const teacherReportRows: TeacherReportRow[] = teachers.map((teacher) => ({
-    id: teacher.id,
-    teacherName: teacher.name,
-    totalPresensi: teacherAttendances.filter((item) => item.teacherId === teacher.id).length,
-    hadir: teacherAttendances.filter((item) => item.teacherId === teacher.id && item.status === 'Hadir').length,
-  }));
+  const teachingSessions = new Map<string, { scheduleId: string; date: string; teacherId: string }>();
+
+  teacherAttendances.forEach((attendance) => {
+    teachingSessions.set(`${attendance.scheduleId}-${attendance.date}`, {
+      scheduleId: attendance.scheduleId,
+      date: attendance.date,
+      teacherId: attendance.teacherId,
+    });
+  });
+
+  learningMaterials.forEach((material) => {
+    const schedule = schedules.find((item) => item.id === material.scheduleId);
+    teachingSessions.set(`${material.scheduleId}-${material.date}`, {
+      scheduleId: material.scheduleId,
+      date: material.date,
+      teacherId: material.teacherId || schedule?.teacherId || '',
+    });
+  });
+
+  const teachingSessionList = Array.from(teachingSessions.values());
+
+  const teacherReportRows: TeacherReportRow[] = teachers.map((teacher) => {
+    const totalSesi = teachingSessionList.filter((item) => item.teacherId === teacher.id).length;
+    const totalPresensi = teacherAttendances.filter((item) => item.teacherId === teacher.id).length;
+    const hadir = teacherAttendances.filter((item) => item.teacherId === teacher.id && item.status === 'Hadir').length;
+
+    return {
+      id: teacher.id,
+      teacherName: teacher.name,
+      totalSesi,
+      totalPresensi,
+      hadir,
+      belumPresensi: Math.max(0, totalSesi - totalPresensi),
+    };
+  });
 
   const activityReportRows: ActivityReportRow[] = subjects.map((subject) => ({
     id: subject.id,
@@ -70,8 +101,10 @@ export function KurikulumLaporanPage() {
 
   const teacherColumns: TableColumn<TeacherReportRow>[] = [
     { key: 'teacherName', header: 'Guru', render: (item) => item.teacherName },
+    { key: 'totalSesi', header: 'Sesi Terpantau', render: (item) => item.totalSesi },
     { key: 'totalPresensi', header: 'Total Presensi', render: (item) => item.totalPresensi },
     { key: 'hadir', header: 'Status Hadir', render: (item) => item.hadir },
+    { key: 'belumPresensi', header: 'Belum Presensi', render: (item) => item.belumPresensi },
   ];
 
   const activityColumns: TableColumn<ActivityReportRow>[] = [
@@ -90,7 +123,7 @@ export function KurikulumLaporanPage() {
   const matchesReportSearch = (values: Array<string | number>) =>
     !normalizedReportSearch || values.some((value) => String(value).toLowerCase().includes(normalizedReportSearch));
   const filteredTeacherReportRows = teacherReportRows.filter((row) =>
-    matchesReportSearch([row.teacherName, row.totalPresensi, row.hadir]),
+    matchesReportSearch([row.teacherName, row.totalSesi, row.totalPresensi, row.hadir, row.belumPresensi]),
   );
   const filteredActivityReportRows = activityReportRows.filter((row) =>
     matchesReportSearch([row.subject, row.materi, row.jurnal]),
@@ -117,8 +150,8 @@ export function KurikulumLaporanPage() {
     return [
       ...section(
         'Laporan Kehadiran Guru',
-        ['Guru', 'Total Presensi', 'Status Hadir'],
-        teacherReportRows.map((row) => [row.teacherName, row.totalPresensi, row.hadir]),
+        ['Guru', 'Sesi Terpantau', 'Total Presensi', 'Status Hadir', 'Belum Presensi'],
+        teacherReportRows.map((row) => [row.teacherName, row.totalSesi, row.totalPresensi, row.hadir, row.belumPresensi]),
       ),
       ...section(
         'Aktivitas Pembelajaran',
@@ -185,8 +218,8 @@ export function KurikulumLaporanPage() {
           <p>Dicetak pada ${generatedAt}</p>
           ${tableHtml(
             'Laporan Kehadiran Guru',
-            ['Guru', 'Total Presensi', 'Status Hadir'],
-            teacherReportRows.map((row) => [row.teacherName, row.totalPresensi, row.hadir]),
+            ['Guru', 'Sesi Terpantau', 'Total Presensi', 'Status Hadir', 'Belum Presensi'],
+            teacherReportRows.map((row) => [row.teacherName, row.totalSesi, row.totalPresensi, row.hadir, row.belumPresensi]),
           )}
           ${tableHtml(
             'Aktivitas Pembelajaran',
@@ -237,8 +270,8 @@ export function KurikulumLaporanPage() {
       <div className="grid gap-5 lg:grid-cols-3">
         <StatCard
           title="Laporan Kehadiran Guru"
-          value={teacherAttendances.length}
-          description="Total data presensi mengajar yang masuk ke sistem monitoring."
+          value={teachingSessionList.length}
+          description="Total sesi mengajar terpantau dari presensi guru atau input materi."
           icon={ClipboardCheck}
         />
         <StatCard

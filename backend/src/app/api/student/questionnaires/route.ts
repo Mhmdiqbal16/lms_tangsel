@@ -12,11 +12,20 @@ import {
 import { created, fail } from '@/lib/responses';
 import type { TeacherQuestionnaire } from '@/types/domain';
 
+const ratingSchema = z.object({
+  clarity: z.number().int().min(1).max(5),
+  interaction: z.number().int().min(1).max(5),
+  discipline: z.number().int().min(1).max(5),
+  support: z.number().int().min(1).max(5),
+});
+
 const questionnaireSchema = z.object({
   studentId: z.string().min(1).optional(),
   teacherId: z.string().min(1),
   scheduleId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  ratings: ratingSchema,
+  note: z.string().max(1000).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -67,6 +76,8 @@ export async function POST(request: NextRequest) {
     scheduleId: schedule.id,
     date,
     completed: true,
+    ratings: parsed.data.ratings,
+    note: parsed.data.note?.trim() ?? '',
   };
 
   return created(await completeTeacherQuestionnaire(questionnaire));

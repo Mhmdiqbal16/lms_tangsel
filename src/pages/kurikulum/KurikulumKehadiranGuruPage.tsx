@@ -17,23 +17,45 @@ interface AttendanceRow {
 }
 
 export function KurikulumKehadiranGuruPage() {
-  const { teacherAttendances, teachers, schedules, classes, subjects } = useAppData();
+  const { teacherAttendances, learningMaterials, teachers, schedules, classes, subjects } = useAppData();
   const [searchTerm, setSearchTerm] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  const baseRows: AttendanceRow[] = teacherAttendances
-    .map((attendance) => {
-      const schedule = schedules.find((item) => item.id === attendance.scheduleId);
+  const teachingSessions = new Map<string, { scheduleId: string; date: string; teacherId: string }>();
+
+  teacherAttendances.forEach((attendance) => {
+    teachingSessions.set(`${attendance.scheduleId}-${attendance.date}`, {
+      scheduleId: attendance.scheduleId,
+      date: attendance.date,
+      teacherId: attendance.teacherId,
+    });
+  });
+
+  learningMaterials.forEach((material) => {
+    const schedule = schedules.find((item) => item.id === material.scheduleId);
+    teachingSessions.set(`${material.scheduleId}-${material.date}`, {
+      scheduleId: material.scheduleId,
+      date: material.date,
+      teacherId: material.teacherId || schedule?.teacherId || '',
+    });
+  });
+
+  const baseRows: AttendanceRow[] = Array.from(teachingSessions.values())
+    .map((session) => {
+      const schedule = schedules.find((item) => item.id === session.scheduleId);
+      const attendance = teacherAttendances.find(
+        (item) => item.scheduleId === session.scheduleId && item.date === session.date,
+      );
       return {
-        id: attendance.id,
-        teacherName: teachers.find((item) => item.id === attendance.teacherId)?.name ?? '-',
+        id: `${session.scheduleId}-${session.date}`,
+        teacherName: teachers.find((item) => item.id === (attendance?.teacherId ?? session.teacherId))?.name ?? '-',
         className: classes.find((item) => item.id === schedule?.classId)?.name ?? '-',
         subject: subjects.find((item) => item.id === schedule?.subjectId)?.name ?? '-',
-        date: attendance.date,
+        date: session.date,
         time: schedule ? `${schedule.startTime} - ${schedule.endTime}` : '-',
-        status: attendance.status,
+        status: attendance?.status ?? 'Belum Presensi',
       };
     })
     .sort((first, second) => second.date.localeCompare(first.date));
@@ -63,7 +85,11 @@ export function KurikulumKehadiranGuruPage() {
     {
       key: 'status',
       header: 'Status Hadir',
-      render: (item) => <Badge variant={item.status === 'Hadir' ? 'green' : 'yellow'}>{item.status}</Badge>,
+      render: (item) => (
+        <Badge variant={item.status === 'Hadir' ? 'green' : item.status === 'Belum Presensi' ? 'red' : 'yellow'}>
+          {item.status}
+        </Badge>
+      ),
     },
   ];
 

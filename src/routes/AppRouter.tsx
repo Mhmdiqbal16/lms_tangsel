@@ -4,17 +4,19 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 import { AdminMasterDataPage } from '@/pages/admin/AdminMasterDataPage';
 import { GuruDashboardPage } from '@/pages/guru/GuruDashboardPage';
+import { GuruHasilAssessmentPage } from '@/pages/guru/GuruHasilAssessmentPage';
 import { GuruJurnalSiswaPage } from '@/pages/guru/GuruJurnalSiswaPage';
 import { GuruMateriPage } from '@/pages/guru/GuruMateriPage';
 import { GuruPresensiPage } from '@/pages/guru/GuruPresensiPage';
 import { GuruProfilPage } from '@/pages/guru/GuruProfilPage';
 import { GuruRiwayatPage } from '@/pages/guru/GuruRiwayatPage';
 import { KurikulumDashboardPage } from '@/pages/kurikulum/KurikulumDashboardPage';
-import { KurikulumHasilPosttestPage } from '@/pages/kurikulum/KurikulumHasilPosttestPage';
+import { KurikulumHasilKuisionerPage } from '@/pages/kurikulum/KurikulumHasilKuisionerPage';
 import { KurikulumJurnalSiswaPage } from '@/pages/kurikulum/KurikulumJurnalSiswaPage';
 import { KurikulumKehadiranGuruPage } from '@/pages/kurikulum/KurikulumKehadiranGuruPage';
 import { KurikulumLaporanPage } from '@/pages/kurikulum/KurikulumLaporanPage';
 import { KurikulumMonitoringMateriPage } from '@/pages/kurikulum/KurikulumMonitoringMateriPage';
+import { KurikulumProfilPage } from '@/pages/kurikulum/KurikulumProfilPage';
 import { KurikulumValidasiPage } from '@/pages/kurikulum/KurikulumValidasiPage';
 import { SiswaAbsensiPage } from '@/pages/siswa/SiswaAbsensiPage';
 import { SiswaAkunPage } from '@/pages/siswa/SiswaAkunPage';
@@ -93,6 +95,16 @@ export function AppRouter() {
             >
               <Route path="/guru/jurnal-siswa" element={<GuruJurnalSiswaPage />} />
             </Route>
+            <Route
+              element={
+                <ProtectedRoute
+                  allowedRoles={['guru']}
+                  requiredPermission="assessment.result.view_taught_classes"
+                />
+              }
+            >
+              <Route path="/guru/hasil-test" element={<GuruHasilAssessmentPage />} />
+            </Route>
             <Route path="/guru/test" element={<Navigate to="/guru/materi" replace />} />
             <Route
               element={<ProtectedRoute allowedRoles={['guru']} requiredPermission="teaching.history.view_own" />}
@@ -132,10 +144,11 @@ export function AppRouter() {
               <Route path="/kurikulum/jurnal-siswa" element={<KurikulumJurnalSiswaPage />} />
             </Route>
             <Route
-              element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="assessment.result.view" />}
+              element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="questionnaire.result.view" />}
             >
-              <Route path="/kurikulum/hasil-posttest" element={<KurikulumHasilPosttestPage />} />
+              <Route path="/kurikulum/hasil-kuisioner" element={<KurikulumHasilKuisionerPage />} />
             </Route>
+            <Route path="/kurikulum/hasil-posttest" element={<Navigate to="/kurikulum/hasil-kuisioner" replace />} />
             <Route element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="report.view" />}>
               <Route path="/kurikulum/laporan" element={<KurikulumLaporanPage />} />
             </Route>
@@ -143,6 +156,9 @@ export function AppRouter() {
               element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="validation.manage" />}
             >
               <Route path="/kurikulum/validasi" element={<KurikulumValidasiPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={['kurikulum']} requiredPermission="account.view_own" />}>
+              <Route path="/kurikulum/profil" element={<KurikulumProfilPage />} />
             </Route>
           </Route>
         </Route>

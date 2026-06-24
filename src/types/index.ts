@@ -12,7 +12,9 @@ export type Permission =
   | 'learning.material.create'
   | 'student.journal.view_taught_classes'
   | 'assessment.manage'
+  | 'assessment.result.view_taught_classes'
   | 'assessment.result.view'
+  | 'questionnaire.result.view'
   | 'teaching.history.view_own'
   | 'dashboard.monitor'
   | 'teacher.attendance.monitor'
@@ -117,6 +119,8 @@ export type ValidationStatus = 'Menunggu' | 'Valid' | 'Ditolak';
 export type AlignmentStatus = 'Sesuai' | 'Belum Diisi' | 'Perlu Cek';
 export type ActiveStatus = 'Aktif' | 'Nonaktif';
 export type AssessmentType = 'pretest' | 'posttest';
+export type QuestionnaireRatingKey = 'clarity' | 'interaction' | 'discipline' | 'support';
+export type QuestionnaireRatings = Record<QuestionnaireRatingKey, number>;
 
 export interface LearningMaterial {
   id: string;
@@ -171,6 +175,8 @@ export interface TeacherQuestionnaire {
   scheduleId: string;
   date: string;
   completed: boolean;
+  ratings?: Partial<QuestionnaireRatings>;
+  note?: string;
 }
 
 export interface StudentJournal {
