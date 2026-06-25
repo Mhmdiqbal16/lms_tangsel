@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, TableColumn } from '@/components/tables/DataTable';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/apiClient';
+import { useActionNotifier } from '@/useActionNotifier';
 import { ClassRoom, Role, Schedule, StudentProfile, Subject, TeacherProfile, User } from '@/types';
 import { formatDayName } from '@/utils/date';
 import { getRoleLabel } from '@/utils/helpers';
@@ -35,6 +36,7 @@ const emptyAccountForm = {
   name: '',
   email: '',
   employeeId: '',
+  classId: '',
   subjectIds: [] as string[],
 };
 
@@ -92,6 +94,7 @@ export function AdminMasterDataPage() {
   const { session } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('accounts');
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  useActionNotifier(message);
   const [teacherForm, setTeacherForm] = useState(emptyTeacherForm);
   const [classForm, setClassForm] = useState(emptyClassForm);
   const [subjectForm, setSubjectForm] = useState(emptySubjectForm);
@@ -322,31 +325,89 @@ export function AdminMasterDataPage() {
   const handleAccountSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const normalizedAccountForm = {
+      role: accountForm.role,
+      referenceId: accountForm.referenceId.trim(),
+      identifier: accountForm.identifier.trim(),
+      password: accountForm.password,
+      name: accountForm.name.trim(),
+      email: accountForm.email.trim(),
+      employeeId: accountForm.employeeId.trim(),
+      classId: accountForm.classId.trim(),
+      subjectIds: accountForm.subjectIds,
+    };
+    const linkedStudent = databaseStudents.find((student) => student.nisn === normalizedAccountForm.identifier);
+
+    if (!normalizedAccountForm.name || !normalizedAccountForm.identifier || normalizedAccountForm.password.length < 6) {
+      setMessage({
+        tone: 'warning',
+        text: 'Nama, username/NISN/NIP, dan password minimal 6 karakter wajib diisi.',
+      });
+      return;
+    }
+
+    if (normalizedAccountForm.role === 'siswa' && !linkedStudent && !normalizedAccountForm.classId) {
+      setMessage({
+        tone: 'warning',
+        text: 'Pilih kelas siswa terlebih dahulu untuk membuat akun siswa baru.',
+      });
+      return;
+    }
+
+    if (normalizedAccountForm.role === 'guru' && !normalizedAccountForm.referenceId && normalizedAccountForm.subjectIds.length === 0) {
+      setMessage({
+        tone: 'warning',
+        text: 'Pilih minimal satu mata pelajaran untuk membuat akun guru baru.',
+      });
+      return;
+    }
+
+    if (normalizedAccountForm.role === 'kurikulum' && !normalizedAccountForm.employeeId) {
+      setMessage({ tone: 'warning', text: 'ID pegawai wajib diisi untuk akun kurikulum.' });
+      return;
+    }
+
     setIsAccountSubmitting(true);
 
     try {
       const account = await apiRequest<AccountRecord>('/api/admin/accounts', {
         method: 'POST',
         body: JSON.stringify({
-          role: accountForm.role,
-          identifier: accountForm.identifier,
-          password: accountForm.password,
-          name: accountForm.name,
-          email: accountForm.email || undefined,
-          referenceId: accountForm.role === 'guru' && accountForm.referenceId ? accountForm.referenceId : undefined,
-          employeeId: accountForm.role === 'kurikulum' ? accountForm.employeeId : undefined,
-          subjectIds: accountForm.role === 'guru' ? accountForm.subjectIds : undefined,
+          role: normalizedAccountForm.role,
+          identifier: normalizedAccountForm.identifier,
+          password: normalizedAccountForm.password,
+          name: normalizedAccountForm.name,
+          email: normalizedAccountForm.email || undefined,
+          classId: normalizedAccountForm.role === 'siswa' ? normalizedAccountForm.classId : undefined,
+          referenceId:
+            normalizedAccountForm.role === 'guru' && normalizedAccountForm.referenceId
+              ? normalizedAccountForm.referenceId
+              : undefined,
+          employeeId: normalizedAccountForm.role === 'kurikulum' ? normalizedAccountForm.employeeId : undefined,
+          subjectIds: normalizedAccountForm.role === 'guru' ? normalizedAccountForm.subjectIds : undefined,
         }),
       });
 
-      setAccounts((current) => [account, ...current]);
-      if (accountForm.role === 'siswa') {
-        setDatabaseStudents(await apiRequest<StudentProfile[]>('/api/admin/students'));
-      } else if (accountForm.role === 'guru') {
-        setDatabaseTeachers(await apiRequest<TeacherProfile[]>('/api/admin/teachers'));
+      setAccounts((current) => upsertRecord(current, account));
+
+      let refreshFailed = false;
+      try {
+        if (normalizedAccountForm.role === 'siswa') {
+          setDatabaseStudents(await apiRequest<StudentProfile[]>('/api/admin/students'));
+        } else if (normalizedAccountForm.role === 'guru') {
+          setDatabaseTeachers(await apiRequest<TeacherProfile[]>('/api/admin/teachers'));
+        }
+      } catch {
+        refreshFailed = true;
       }
+
       setAccountForm(emptyAccountForm);
-      setMessage({ tone: 'success', text: 'Akun berhasil dibuat dan tersimpan ke database.' });
+      setMessage({
+        tone: 'success',
+        text: refreshFailed
+          ? 'Akun berhasil dibuat. Muat ulang halaman jika data profil belum langsung terlihat.'
+          : 'Akun berhasil dibuat dan tersimpan ke database.',
+      });
     } catch (error) {
       setMessage({
         tone: 'warning',
@@ -775,6 +836,7 @@ export function AdminMasterDataPage() {
                     identifier: '',
                     email: '',
                     employeeId: '',
+                    classId: '',
                     subjectIds: [],
                   }))
                 }
@@ -836,6 +898,20 @@ export function AdminMasterDataPage() {
                   className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
                   placeholder="ID pegawai"
                 />
+              ) : null}
+              {accountForm.role === 'siswa' ? (
+                <select
+                  value={accountForm.classId}
+                  onChange={(event) => setAccountForm((current) => ({ ...current, classId: event.target.value }))}
+                  className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                >
+                  <option value="">Pilih kelas siswa</option>
+                  {databaseClasses.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+                </select>
               ) : null}
             </div>
             {accountForm.role === 'guru' ? (

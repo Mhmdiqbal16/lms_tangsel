@@ -196,6 +196,7 @@ create table if not exists assessment_student_statuses (
   student_id text not null references students(id) on delete cascade,
   completed boolean not null default false,
   completed_at timestamptz,
+  score integer not null default 0 check (score >= 0),
   primary key (assessment_id, student_id)
 );
 

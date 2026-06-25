@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { DataTable, TableColumn } from '@/components/tables/DataTable';
 import { useAppData } from '@/hooks/useAppData';
+import { useActionNotifier } from '@/useActionNotifier';
 import { BookOpenText, ClipboardCheck, NotebookPen } from 'lucide-react';
 
 interface TeacherReportRow {
@@ -34,6 +35,7 @@ interface JournalReportRow {
 export function KurikulumLaporanPage() {
   const { teachers, teacherAttendances, subjects, schedules, learningMaterials, studentJournals, classes } = useAppData();
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  useActionNotifier(message);
   const [activeReport, setActiveReport] = useState<'teachers' | 'activities' | 'journals'>('teachers');
   const [reportSearch, setReportSearch] = useState('');
 

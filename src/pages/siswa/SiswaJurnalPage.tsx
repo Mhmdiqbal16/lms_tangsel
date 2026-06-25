@@ -1,9 +1,11 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { formatDateID, formatDayName } from '@/utils/date';
+import { useActionNotifier } from '@/useActionNotifier';
 import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
 
 const statusVariantMap = {
@@ -36,11 +38,13 @@ export function SiswaJurnalPage() {
     learningObstacles: '',
     attachmentName: '',
   });
+  useActionNotifier(message);
 
   const requestedKey =
     searchParams.get('scheduleId') && searchParams.get('date')
       ? `${searchParams.get('scheduleId')}-${searchParams.get('date')}`
       : '';
+  const isFormOpen = Boolean(requestedKey && sessions.some((item) => item.key === requestedKey));
   const selectedSession = sessions.find((item) => item.key === requestedKey) ?? sessions[0];
 
   useEffect(() => {
@@ -89,6 +93,12 @@ export function SiswaJurnalPage() {
       scheduleId: session.schedule.id,
       date: session.sessionDate,
     });
+    setMessage(null);
+  };
+
+  const handleBackToList = () => {
+    setSearchParams({});
+    setMessage(null);
   };
 
   const handleChange = (field: keyof JournalFormState, value: string) => {
@@ -138,26 +148,26 @@ export function SiswaJurnalPage() {
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      {!isFormOpen ? (
         <section className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Daftar Pelajaran Aktif & H+1</h2>
+              <h2 className="text-xl font-bold text-slate-900">Daftar Jurnal Pelajaran Aktif</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Pilih sesi pelajaran yang akan dilengkapi syarat dan jurnalnya.
+                Pilih mata pelajaran untuk membuka form jurnal sesuai sesi yang dipilih.
               </p>
             </div>
             <Badge variant="blue">Batas H+1 aktif</Badge>
           </div>
 
-          <div className="mt-6 max-h-[620px] space-y-4 overflow-y-auto pr-2">
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
             {sessions.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => handleSelectSession(item.key)}
                 className={`w-full rounded-3xl border p-5 text-left transition ${
-                  selectedSession.key === item.key
+                  requestedKey === item.key
                     ? 'border-brand-600 bg-brand-50 shadow-soft'
                     : 'border-brand-100 bg-white hover:border-brand-300 hover:bg-brand-50/50'
                 }`}
@@ -179,8 +189,17 @@ export function SiswaJurnalPage() {
             ))}
           </div>
         </section>
-
+      ) : (
         <div className="space-y-6">
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="inline-flex items-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Kembali ke Daftar Jurnal
+          </button>
+
           <section className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -251,11 +270,11 @@ export function SiswaJurnalPage() {
           </section>
 
           <section className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Form Jurnal</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Form aktif setelah pretest selesai.
+                  {selectedSession.subject?.name ?? '-'} • Form aktif setelah pretest selesai.
                 </p>
               </div>
               <Badge variant="blue">{formatDateID(selectedSession.sessionDate)}</Badge>
@@ -338,7 +357,7 @@ export function SiswaJurnalPage() {
               </div>
 
               <label className="space-y-2 text-sm font-medium text-slate-700">
-                <span>Upload lampiran (dummy)</span>
+                <span>Upload lampiran</span>
                 <input
                   type="file"
                   onChange={handleFileChange}
@@ -353,21 +372,30 @@ export function SiswaJurnalPage() {
               ) : null}
 
               <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-4 text-sm leading-6 text-slate-600">
-                Jurnal hanya dapat diisi pada hari pembelajaran berlangsung atau maksimal H+1. Jika melewati H+1,
-                status sesi akan berubah menjadi terkunci.
+                Jurnal dapat diisi pada hari pelajaran atau paling lambat 1 hari setelahnya. Jika melewati batas
+                tersebut, status sesi akan berubah menjadi terkunci.
               </div>
 
-              <button
-                type="submit"
-                disabled={!selectedSession.eligibility.canSubmit || isSaving}
-                className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {isSaving ? 'Menyimpan...' : 'Simpan Jurnal'}
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={!selectedSession.eligibility.canSubmit || isSaving}
+                  className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isSaving ? 'Menyimpan...' : 'Simpan Jurnal'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="rounded-2xl border border-brand-200 px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                >
+                  Kembali ke Daftar
+                </button>
+              </div>
             </form>
           </section>
         </div>
-      </div>
+      )}
     </div>
   );
 }

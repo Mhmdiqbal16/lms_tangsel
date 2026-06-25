@@ -57,7 +57,7 @@ function formatAverage(value: number | null) {
 
 export function KurikulumHasilKuisionerPage() {
   const { questionnaires, students, teachers, schedules, classes, subjects } = useAppData();
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   const resultRows: QuestionnaireResultRow[] = questionnaires
@@ -100,11 +100,11 @@ export function KurikulumHasilKuisionerPage() {
     .filter((item) => item.count > 0)
     .sort((first, second) => first.className.localeCompare(second.className));
 
-  const selectedClass =
-    classSummaries.find((item) => item.id === selectedClassId) ?? classSummaries[0];
+  const selectedClass = selectedClassId === 'all' ? null : classSummaries.find((item) => item.id === selectedClassId);
+  const activeClassId = selectedClassId === 'all' || selectedClass ? selectedClassId : 'all';
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredRows = resultRows
-    .filter((row) => (selectedClass ? row.classId === selectedClass.id : true))
+    .filter((row) => (activeClassId === 'all' ? true : row.classId === activeClassId))
     .filter((row) => {
       if (!normalizedSearch) {
         return true;
@@ -121,9 +121,18 @@ export function KurikulumHasilKuisionerPage() {
     .filter((value): value is number => typeof value === 'number');
   const overallAverage =
     allAverages.length > 0 ? allAverages.reduce((total, value) => total + value, 0) / allAverages.length : null;
+  const filteredAverages = filteredRows
+    .map((row) => row.average)
+    .filter((value): value is number => typeof value === 'number');
+  const filteredAverage =
+    filteredAverages.length > 0
+      ? filteredAverages.reduce((total, value) => total + value, 0) / filteredAverages.length
+      : null;
+  const activeClassLabel = selectedClass?.className ?? 'Semua kelas';
 
   const columns: TableColumn<QuestionnaireResultRow>[] = [
     { key: 'date', header: 'Tanggal', render: (item) => formatDateID(item.date) },
+    { key: 'className', header: 'Kelas', render: (item) => item.className },
     { key: 'studentName', header: 'Siswa', render: (item) => item.studentName },
     { key: 'teacherName', header: 'Guru', render: (item) => item.teacherName },
     { key: 'subject', header: 'Mapel', render: (item) => item.subject },
@@ -183,7 +192,22 @@ export function KurikulumHasilKuisionerPage() {
       </div>
 
       <FilterBar>
-        <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-3">
+        <label className="space-y-2 text-sm font-medium text-slate-700">
+          <span>Filter Kelas</span>
+          <select
+            value={activeClassId}
+            onChange={(event) => setSelectedClassId(event.target.value)}
+            className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+          >
+            <option value="all">Semua kelas</option>
+            {classSummaries.map((classItem) => (
+              <option key={classItem.id} value={classItem.id}>
+                {classItem.className} - {classItem.count} kuisioner
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-2 text-sm font-medium text-slate-700">
           <span>Cari Hasil Kuisioner</span>
           <input
             value={searchTerm}
@@ -197,7 +221,7 @@ export function KurikulumHasilKuisionerPage() {
             type="button"
             onClick={() => {
               setSearchTerm('');
-              setSelectedClassId('');
+              setSelectedClassId('all');
             }}
             className="w-full rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
           >
@@ -213,23 +237,38 @@ export function KurikulumHasilKuisionerPage() {
           icon={FileSearch}
         />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
+        <div className="space-y-6">
           <section className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Pilih Kelas</h2>
-                <p className="mt-1 text-sm text-slate-500">Pilih kelas untuk melihat rincian kuisioner.</p>
+                <h2 className="text-xl font-bold text-slate-900">Ringkasan Kelas</h2>
+                <p className="mt-1 text-sm text-slate-500">Pilih kelas atau lihat semua hasil kuisioner.</p>
               </div>
               <Badge variant="blue">{classSummaries.length} kelas</Badge>
             </div>
-            <div className="mt-6 max-h-[620px] space-y-3 overflow-y-auto pr-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setSelectedClassId('all')}
+                className={`w-full rounded-2xl border p-5 text-left transition ${
+                  activeClassId === 'all'
+                    ? 'border-brand-600 bg-brand-50 shadow-soft'
+                    : 'border-brand-100 bg-white hover:border-brand-300 hover:bg-brand-50/50'
+                }`}
+              >
+                <p className="text-lg font-semibold text-slate-900">Semua kelas</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant="green">{resultRows.length} kuisioner</Badge>
+                  <Badge variant="blue">Rata-rata {formatAverage(overallAverage)}</Badge>
+                </div>
+              </button>
               {classSummaries.map((classItem) => (
                 <button
                   key={classItem.id}
                   type="button"
                   onClick={() => setSelectedClassId(classItem.id)}
-                  className={`w-full rounded-3xl border p-5 text-left transition ${
-                    selectedClass?.id === classItem.id
+                  className={`w-full rounded-2xl border p-5 text-left transition ${
+                    activeClassId === classItem.id
                       ? 'border-brand-600 bg-brand-50 shadow-soft'
                       : 'border-brand-100 bg-white hover:border-brand-300 hover:bg-brand-50/50'
                   }`}
@@ -245,12 +284,15 @@ export function KurikulumHasilKuisionerPage() {
           </section>
 
           <section className="space-y-4">
-            <div className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand-500">Kelas Terpilih</p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">{selectedClass?.className ?? '-'}</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                {selectedClass ? `${selectedClass.count} kuisioner masuk - rata-rata ${formatAverage(selectedClass.average)}` : '-'}
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand-500">Filter Aktif</p>
+                <h2 className="mt-2 text-2xl font-bold text-slate-900">{activeClassLabel}</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="green">{filteredRows.length} kuisioner tampil</Badge>
+                <Badge variant="blue">Rata-rata {formatAverage(filteredAverage)}</Badge>
+              </div>
             </div>
 
             <DataTable

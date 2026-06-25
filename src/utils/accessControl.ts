@@ -35,29 +35,10 @@ export const permissionsByRole: Record<Role, Permission[]> = {
 };
 
 const accessHighlightsByRole: Record<Role, string[]> = {
-  siswa: [
-    'Melihat dashboard, jadwal, dan absensi pribadi.',
-    'Mengisi jurnal pembelajaran sesuai syarat yang berlaku.',
-    'Mengakses akun pribadi dan riwayat jurnal sendiri.',
-  ],
-  guru: [
-    'Mengisi presensi mengajar sesuai jadwal dan akun guru yang aktif.',
-    'Mengisi absensi siswa untuk kelas yang sedang diajar dengan status hadir, izin, atau alfa.',
-    'Menginput materi, assessment, serta melihat hasil pretest dan posttest pada kelas yang diajar.',
-    'Melihat jurnal siswa pada kelas dan mata pelajaran yang diajar.',
-    'Melihat riwayat mengajar dan profil pribadi tanpa membuka data guru lain.',
-  ],
-  kurikulum: [
-    'Memantau dashboard monitoring, kehadiran guru, jurnal siswa, dan hasil kuisioner lintas kelas.',
-    'Melihat laporan pembelajaran dan monitoring materi guru.',
-    'Memvalidasi jurnal siswa serta materi guru sebagai bagian kontrol akademik.',
-    'Melihat profil pribadi tanpa akses mengubah data akun.',
-  ],
-  admin: [
-    'Melihat dashboard administrasi sistem yang aktif.',
-    'Mengelola data master siswa, guru, kelas, mata pelajaran, dan jadwal.',
-    'Tidak ikut mengubah data akademik harian guru, siswa, atau kurikulum.',
-  ],
+  siswa: ['Melihat dashboard, jadwal, dan absensi pribadi.'],
+  guru: ['Mengisi presensi mengajar sesuai jadwal dan akun guru yang aktif.'],
+  kurikulum: ['Memantau dashboard monitoring, kehadiran guru, jurnal siswa, dan hasil kuisioner lintas kelas.'],
+  admin: ['Melihat dashboard administrasi sistem yang aktif.'],
 };
 
 export function hasPermissionForRole(role: Role, permission: Permission) {

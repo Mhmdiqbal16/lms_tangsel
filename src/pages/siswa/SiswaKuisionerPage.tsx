@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import type { QuestionnaireRatings } from '@/types';
+import { useActionNotifier } from '@/useActionNotifier';
 import { formatDateID, formatDayName } from '@/utils/date';
 import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
 
@@ -44,6 +45,7 @@ export function SiswaKuisionerPage() {
   const [forms, setForms] = useState<Record<string, QuestionnaireFormState>>({});
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  useActionNotifier(message);
 
   const requestedKey =
     searchParams.get('scheduleId') && searchParams.get('date')

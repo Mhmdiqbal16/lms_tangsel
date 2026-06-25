@@ -1,6 +1,7 @@
 import { CalendarDays, LogOut, Menu } from 'lucide-react';
 import { academicDateReference } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/ToastContext';
 import { formatDateID } from '@/utils/date';
 import { getInitials, getRoleLabel } from '@/utils/helpers';
 
@@ -10,6 +11,7 @@ interface TopbarProps {
 
 export function Topbar({ onOpenSidebar }: TopbarProps) {
   const { session, logout } = useAuth();
+  const { showToast } = useToast();
 
   if (!session) {
     return null;
@@ -48,7 +50,10 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
           </div>
           <button
             type="button"
-            onClick={logout}
+            onClick={() => {
+              logout();
+              showToast({ tone: 'info', message: 'Anda berhasil logout.' });
+            }}
             className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700"
           >
             <LogOut className="h-4 w-4" />
@@ -59,4 +64,3 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
     </header>
   );
 }
-

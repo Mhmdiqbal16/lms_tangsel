@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
+import { useActionNotifier } from '@/useActionNotifier';
 import { formatDateID, formatDayName } from '@/utils/date';
 
 const MAX_QUESTIONS = 10;
@@ -57,6 +58,7 @@ export function GuruAssessmentSection({ showHeader = true }: GuruAssessmentSecti
   const [testConfirmation, setTestConfirmation] = useState<TestConfirmation | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  useActionNotifier(message);
 
   if (!teacher) {
     return null;

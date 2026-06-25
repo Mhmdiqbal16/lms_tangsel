@@ -15,6 +15,10 @@ const completeAssessmentSchema = z.object({
   ),
 });
 
+function normalizeAnswer(value: string) {
+  return value.trim();
+}
+
 export async function POST(request: NextRequest) {
   const { user, response } = await requireRole(request, ['siswa']);
 
@@ -42,13 +46,15 @@ export async function POST(request: NextRequest) {
     return fail('Assessment tidak tersedia untuk siswa ini.', 403);
   }
 
-  const answerMap = new Map(parsed.data.answers.map((answer) => [answer.questionId, answer.answer]));
+  const answerMap = new Map(parsed.data.answers.map((answer) => [answer.questionId, normalizeAnswer(answer.answer)]));
   const missingAnswer = assessment.questions.find((question) => !answerMap.get(question.id));
   if (missingAnswer) {
     return fail('Lengkapi seluruh jawaban assessment sebelum mengumpulkan.', 422);
   }
 
-  const invalidAnswer = assessment.questions.find((question) => !question.options.includes(answerMap.get(question.id) ?? ''));
+  const invalidAnswer = assessment.questions.find(
+    (question) => !question.options.map(normalizeAnswer).includes(answerMap.get(question.id) ?? ''),
+  );
   if (invalidAnswer) {
     return fail('Terdapat jawaban assessment yang tidak sesuai opsi soal.', 422);
   }

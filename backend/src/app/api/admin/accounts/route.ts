@@ -4,16 +4,21 @@ import { publicUser, requireRole } from '@/lib/auth';
 import { createAccount, deleteAccount, listUsers, RepositoryError } from '@/lib/repository';
 import { created, fail, ok } from '@/lib/responses';
 
+const optionalTrimmedEmailSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim() : value),
+  z.string().email().optional().or(z.literal('')),
+);
+
 const accountSchema = z.object({
   role: z.enum(['siswa', 'guru', 'kurikulum', 'admin']),
-  identifier: z.string().min(3),
+  identifier: z.string().trim().min(3),
   password: z.string().min(6),
-  name: z.string().min(2),
-  email: z.string().email().optional().or(z.literal('')),
-  referenceId: z.string().optional(),
-  classId: z.string().optional(),
-  employeeId: z.string().optional(),
-  subjectIds: z.array(z.string()).optional(),
+  name: z.string().trim().min(2),
+  email: optionalTrimmedEmailSchema,
+  referenceId: z.string().trim().optional(),
+  classId: z.string().trim().optional(),
+  employeeId: z.string().trim().optional(),
+  subjectIds: z.array(z.string().trim()).optional(),
 });
 
 const deleteAccountSchema = z.object({

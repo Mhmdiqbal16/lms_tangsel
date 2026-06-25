@@ -29,6 +29,15 @@ function getAssessmentLabel(
   return `${subjectName} - ${className} - Pertemuan ${assessment.meeting} - ${formatDateID(assessment.date)}`;
 }
 
+function getStudentScore(status: AssessmentRecord['studentStatuses'][number]) {
+  const answers = status.answers ?? [];
+  if (answers.length > 0) {
+    return answers.filter((answer) => answer.correct).length;
+  }
+
+  return typeof status.score === 'number' ? status.score : undefined;
+}
+
 export function KurikulumHasilPosttestPage() {
   const { assessments, students, teachers, classes, subjects } = useAppData();
   const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
@@ -63,10 +72,7 @@ export function KurikulumHasilPosttestPage() {
     assessment.studentStatuses
       .filter((status) => status.completed && (typeof status.score === 'number' || (status.answers?.length ?? 0) > 0))
       .map((status) => {
-        const score =
-          typeof status.score === 'number'
-            ? status.score
-            : (status.answers ?? []).filter((answer) => answer.correct).length;
+        const score = getStudentScore(status) ?? 0;
         return Math.round((score / Math.max(assessment.questions.length, 1)) * 100);
       }),
   );
@@ -79,16 +85,12 @@ export function KurikulumHasilPosttestPage() {
     ? selectedAssessment.studentStatuses
         .map((status) => {
           const answers = status.answers ?? [];
+          const score = getStudentScore(status);
           return {
             id: `${selectedAssessment.id}-${status.studentId}`,
             studentName: students.find((student) => student.id === status.studentId)?.name ?? '-',
             completed: status.completed,
-            score:
-              typeof status.score === 'number'
-                ? status.score
-                : answers.length > 0
-                  ? answers.filter((answer) => answer.correct).length
-                  : undefined,
+            score,
             totalQuestions: selectedAssessment.questions.length,
             answers,
           };

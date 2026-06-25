@@ -624,8 +624,8 @@ export const assessments: AssessmentRecord[] = [
     status: 'Aktif',
     questions: buildQuestions('Pretest Basis Data', 5),
     studentStatuses: [
-      { studentId: 'std-1', completed: true },
-      { studentId: 'std-2', completed: true },
+      { studentId: 'std-1', completed: true, score: 5 },
+      { studentId: 'std-2', completed: true, score: 4 },
       { studentId: 'std-3', completed: false },
     ],
   },
@@ -642,8 +642,8 @@ export const assessments: AssessmentRecord[] = [
     status: 'Aktif',
     questions: buildQuestions('Posttest Basis Data', 5),
     studentStatuses: [
-      { studentId: 'std-1', completed: true },
-      { studentId: 'std-2', completed: true },
+      { studentId: 'std-1', completed: true, score: 5 },
+      { studentId: 'std-2', completed: true, score: 5 },
       { studentId: 'std-3', completed: false },
     ],
   },
@@ -660,8 +660,8 @@ export const assessments: AssessmentRecord[] = [
     status: 'Aktif',
     questions: buildQuestions('Pretest PBO', 5),
     studentStatuses: [
-      { studentId: 'std-1', completed: true },
-      { studentId: 'std-2', completed: true },
+      { studentId: 'std-1', completed: true, score: 4 },
+      { studentId: 'std-2', completed: true, score: 3 },
       { studentId: 'std-3', completed: false },
     ],
   },
@@ -679,7 +679,7 @@ export const assessments: AssessmentRecord[] = [
     questions: buildQuestions('Posttest PBO', 5),
     studentStatuses: [
       { studentId: 'std-1', completed: false },
-      { studentId: 'std-2', completed: true },
+      { studentId: 'std-2', completed: true, score: 4 },
       { studentId: 'std-3', completed: false },
     ],
   },
@@ -696,9 +696,9 @@ export const assessments: AssessmentRecord[] = [
     status: 'Aktif',
     questions: buildQuestions('Pretest Rabu', 4),
     studentStatuses: [
-      { studentId: 'std-1', completed: true },
-      { studentId: 'std-2', completed: true },
-      { studentId: 'std-3', completed: true },
+      { studentId: 'std-1', completed: true, score: 4 },
+      { studentId: 'std-2', completed: true, score: 3 },
+      { studentId: 'std-3', completed: true, score: 2 },
     ],
   },
   {
@@ -715,8 +715,8 @@ export const assessments: AssessmentRecord[] = [
     questions: buildQuestions('Posttest Rabu', 4),
     studentStatuses: [
       { studentId: 'std-1', completed: false },
-      { studentId: 'std-2', completed: true },
-      { studentId: 'std-3', completed: true },
+      { studentId: 'std-2', completed: true, score: 4 },
+      { studentId: 'std-3', completed: true, score: 3 },
     ],
   },
 ];

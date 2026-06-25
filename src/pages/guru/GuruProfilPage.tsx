@@ -63,7 +63,7 @@ export function GuruProfilPage() {
             <div className="min-w-0 rounded-2xl bg-brand-50/60 p-4">
               <p className="text-sm font-medium text-slate-500">Hak Perubahan Data</p>
               <p className="mt-2 break-words text-lg font-semibold text-slate-900 [overflow-wrap:anywhere]">
-                Admin
+                Operator Sekolah
               </p>
             </div>
             <div className="min-w-0 rounded-2xl bg-brand-50/60 p-4 md:col-span-3">

@@ -6,6 +6,7 @@ import { DataTable, TableColumn } from '@/components/tables/DataTable';
 import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
+import { useActionNotifier } from '@/useActionNotifier';
 import { StudentAttendanceStatus } from '@/types';
 import { formatDateID, parseISODate } from '@/utils/date';
 
@@ -43,6 +44,7 @@ export function GuruPresensiPage() {
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
   const [isSavingTeacherAttendance, setIsSavingTeacherAttendance] = useState(false);
   const [isSavingStudentAttendances, setIsSavingStudentAttendances] = useState(false);
+  useActionNotifier(message);
 
   if (!teacher) {
     return null;

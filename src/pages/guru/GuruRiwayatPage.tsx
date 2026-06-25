@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, TableColumn } from '@/components/tables/DataTable';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
+import { TeacherAttendanceStatus } from '@/types';
 import { formatDateID } from '@/utils/date';
 
 interface TeachingHistoryRow {
@@ -13,8 +14,9 @@ interface TeachingHistoryRow {
   className: string;
   subject: string;
   material: string;
-  attendanceStatus: string;
+  attendanceStatus: TeacherAttendanceStatus;
   journalCount: number;
+  startTime: string;
 }
 
 export function GuruRiwayatPage() {
@@ -27,27 +29,75 @@ export function GuruRiwayatPage() {
     return null;
   }
 
-  const baseRows: TeachingHistoryRow[] = teacherAttendances
+  const teachingSessions = new Map<string, { scheduleId: string; date: string }>();
+
+  teacherAttendances
     .filter((item) => item.teacherId === teacher.id)
-    .map((attendance) => {
-      const schedule = schedules.find((item) => item.id === attendance.scheduleId);
+    .forEach((attendance) => {
+      teachingSessions.set(`${attendance.scheduleId}-${attendance.date}`, {
+        scheduleId: attendance.scheduleId,
+        date: attendance.date,
+      });
+    });
+
+  learningMaterials
+    .filter((material) => {
+      const schedule = schedules.find((item) => item.id === material.scheduleId);
+      return material.teacherId === teacher.id || schedule?.teacherId === teacher.id;
+    })
+    .forEach((material) => {
+      teachingSessions.set(`${material.scheduleId}-${material.date}`, {
+        scheduleId: material.scheduleId,
+        date: material.date,
+      });
+    });
+
+  studentJournals
+    .filter((journal) => {
+      const schedule = schedules.find((item) => item.id === journal.scheduleId);
+      return schedule?.teacherId === teacher.id;
+    })
+    .forEach((journal) => {
+      teachingSessions.set(`${journal.scheduleId}-${journal.date}`, {
+        scheduleId: journal.scheduleId,
+        date: journal.date,
+      });
+    });
+
+  const baseRows: TeachingHistoryRow[] = Array.from(teachingSessions.values())
+    .flatMap((teachingSession) => {
+      const schedule = schedules.find((item) => item.id === teachingSession.scheduleId);
+      if (!schedule) {
+        return [];
+      }
+
+      const attendance = teacherAttendances.find(
+        (item) =>
+          item.teacherId === teacher.id &&
+          item.scheduleId === teachingSession.scheduleId &&
+          item.date === teachingSession.date,
+      );
       const material = learningMaterials.find(
-        (item) => item.scheduleId === attendance.scheduleId && item.date === attendance.date,
+        (item) => item.scheduleId === teachingSession.scheduleId && item.date === teachingSession.date,
       );
       const journalCount = studentJournals.filter(
-        (item) => item.scheduleId === attendance.scheduleId && item.date === attendance.date,
+        (item) => item.scheduleId === teachingSession.scheduleId && item.date === teachingSession.date,
       ).length;
-      return {
-        id: attendance.id,
-        date: attendance.date,
-        className: classes.find((item) => item.id === schedule?.classId)?.name ?? '-',
-        subject: subjects.find((item) => item.id === schedule?.subjectId)?.name ?? '-',
-        material: material?.title ?? 'Belum diinput',
-        attendanceStatus: attendance.status,
-        journalCount,
-      };
+
+      return [
+        {
+          id: `${teachingSession.scheduleId}-${teachingSession.date}`,
+          date: teachingSession.date,
+          className: classes.find((item) => item.id === schedule.classId)?.name ?? '-',
+          subject: subjects.find((item) => item.id === schedule.subjectId)?.name ?? '-',
+          material: material?.title ?? 'Belum diinput',
+          attendanceStatus: attendance?.status ?? 'Belum Presensi',
+          journalCount,
+          startTime: schedule.startTime,
+        },
+      ];
     })
-    .sort((first, second) => second.date.localeCompare(first.date));
+    .sort((first, second) => second.date.localeCompare(first.date) || first.startTime.localeCompare(second.startTime));
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const rows = baseRows.filter((item) => {
@@ -77,7 +127,15 @@ export function GuruRiwayatPage() {
     {
       key: 'attendanceStatus',
       header: 'Status Presensi',
-      render: (item) => <Badge variant={item.attendanceStatus === 'Hadir' ? 'green' : 'yellow'}>{item.attendanceStatus}</Badge>,
+      render: (item) => (
+        <Badge
+          variant={
+            item.attendanceStatus === 'Hadir' ? 'green' : item.attendanceStatus === 'Belum Presensi' ? 'slate' : 'yellow'
+          }
+        >
+          {item.attendanceStatus}
+        </Badge>
+      ),
     },
     { key: 'journalCount', header: 'Jumlah Jurnal Siswa Masuk', render: (item) => item.journalCount },
   ];

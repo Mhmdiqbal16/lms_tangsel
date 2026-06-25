@@ -7,14 +7,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
-import { getJournalEligibility } from '@/utils/businessRules';
 import { formatDateID, formatDayName, parseISODate } from '@/utils/date';
-
-const statusVariantMap = {
-  Selesai: 'green',
-  Belum: 'yellow',
-  Terkunci: 'red',
-} as const;
 
 export function SiswaDashboardPage() {
   const { session } = useAuth();
@@ -26,8 +19,6 @@ export function SiswaDashboardPage() {
     teachers,
     notifications,
     studentJournals,
-    assessments,
-    questionnaires,
   } = useAppData();
 
   const student = students.find((item) => item.id === session?.referenceId);
@@ -144,73 +135,6 @@ export function SiswaDashboardPage() {
           </div>
         </section>
       </div>
-
-      <section className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Status Pretest, Posttest, Kuisioner, dan Jurnal</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Monitoring kesiapan jurnal untuk setiap pelajaran yang sedang berjalan hari ini.
-            </p>
-          </div>
-          <Badge variant="blue">Live Mock</Badge>
-        </div>
-
-        <div className="mt-6 grid max-h-[560px] gap-4 overflow-y-auto pr-2 xl:grid-cols-2">
-          {todaySchedules.map((schedule) => {
-            const subject = subjects.find((item) => item.id === schedule.subjectId);
-            const teacher = teachers.find((item) => item.id === schedule.teacherId);
-            const eligibility = getJournalEligibility({
-              studentId: student.id,
-              scheduleId: schedule.id,
-              sessionDate: academicDateReference,
-              journals: studentJournals,
-              assessments,
-              questionnaires,
-              currentDate: academicDateReference,
-            });
-
-            return (
-              <div key={schedule.id} className="rounded-3xl border border-brand-100 bg-brand-50/60 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">{subject?.name}</p>
-                    <p className="mt-1 text-sm text-slate-500">{teacher?.name}</p>
-                  </div>
-                  <Badge variant={statusVariantMap[eligibility.status]}>{eligibility.status}</Badge>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-sm font-medium text-slate-500">Pretest</p>
-                    <p className="mt-2 text-base font-semibold text-slate-900">
-                      {eligibility.pretestDone ? 'Selesai' : 'Belum selesai'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-sm font-medium text-slate-500">Posttest</p>
-                    <p className="mt-2 text-base font-semibold text-slate-900">
-                      {eligibility.posttestDone ? 'Selesai' : 'Belum selesai'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-sm font-medium text-slate-500">Kuisioner Guru</p>
-                    <p className="mt-2 text-base font-semibold text-slate-900">
-                      {eligibility.questionnaireDone ? 'Sudah diisi' : 'Belum diisi'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-sm font-medium text-slate-500">Akses Jurnal</p>
-                    <p className="mt-2 text-base font-semibold text-slate-900">
-                      {eligibility.canSubmit ? 'Siap diisi' : eligibility.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
     </motion.div>
   );
 }

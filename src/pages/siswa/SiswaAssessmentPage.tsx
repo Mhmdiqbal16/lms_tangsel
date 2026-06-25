@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { InfoAlert } from '@/components/ui/InfoAlert';
 import { PageHeader } from '@/components/ui/PageHeader';
 import type { AssessmentRecord } from '@/types';
+import { useActionNotifier } from '@/useActionNotifier';
 import { formatDateID, formatDayName } from '@/utils/date';
 import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
 import { ArrowLeft, NotebookPen } from 'lucide-react';
@@ -36,6 +37,7 @@ export function SiswaAssessmentPage({ type }: SiswaAssessmentPageProps) {
   const [answers, setAnswers] = useState<Record<string, Record<string, string>>>({});
   const [pendingAssessmentId, setPendingAssessmentId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  useActionNotifier(message);
 
   const requestedKey =
     searchParams.get('scheduleId') && searchParams.get('date')

@@ -224,6 +224,7 @@ Table assessment_student_statuses {
   student_id text [not null]
   completed boolean [not null]
   completed_at timestamptz
+  score integer [not null, default: 0, note: 'Jumlah jawaban benar']
 
   indexes {
     (assessment_id, student_id) [pk]

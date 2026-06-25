@@ -12,6 +12,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/ToastContext';
 import { getHomeRoute } from '@/utils/businessRules';
 
 const schoolPhotoSlides = [
@@ -24,6 +25,7 @@ const schoolPhotoSlides = [
 export function LoginPage() {
   const navigate = useNavigate();
   const { session, isAuthLoading, login } = useAuth();
+  const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -57,9 +59,11 @@ export function LoginPage() {
 
     if (!result.success) {
       setError(result.message);
+      showToast({ tone: 'warning', message: result.message });
       return;
     }
 
+    showToast({ tone: 'success', message: result.message });
     navigate(getHomeRoute(result.role ?? 'siswa'), { replace: true });
   };
 
@@ -199,6 +203,9 @@ export function LoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+              <p className="text-xs leading-5 text-slate-500">
+                Tidak bisa login atau lupa password? Silakan menghubungi pihak operator sekolah.
+              </p>
             </div>
 
             {error ? (

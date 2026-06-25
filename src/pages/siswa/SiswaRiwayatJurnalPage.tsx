@@ -3,11 +3,8 @@ import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, TableColumn } from '@/components/tables/DataTable';
-import { academicDateReference } from '@/data/mockData';
-import { useAppData } from '@/hooks/useAppData';
-import { useAuth } from '@/hooks/useAuth';
-import { getJournalEligibility } from '@/utils/businessRules';
 import { formatDateID, formatMonthYear, getMonthKey } from '@/utils/date';
+import { useStudentLearningSessions } from '@/pages/siswa/useStudentLearningSessions';
 
 interface HistoryRow {
   id: string;
@@ -17,6 +14,7 @@ interface HistoryRow {
   entryStatus: 'Selesai' | 'Belum Diisi' | 'Terkunci';
   reviewStatus: string;
   notes: string;
+  startTime: string;
 }
 
 const entryVariantMap = {
@@ -26,70 +24,27 @@ const entryVariantMap = {
 } as const;
 
 export function SiswaRiwayatJurnalPage() {
-  const { session } = useAuth();
-  const { students, studentAttendances, studentJournals, assessments, questionnaires, schedules, subjects, learningMaterials } =
-    useAppData();
-  const student = students.find((item) => item.id === session?.referenceId);
+  const { historySessions } = useStudentLearningSessions();
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState('all');
 
-  const historySessions = new Map<string, { scheduleId: string; date: string }>();
-
-  studentAttendances
-    .filter((attendance) => attendance.studentId === student?.id)
-    .forEach((attendance) => {
-      historySessions.set(`${attendance.scheduleId}-${attendance.date}`, {
-        scheduleId: attendance.scheduleId,
-        date: attendance.date,
-      });
-    });
-
-  studentJournals
-    .filter((journal) => journal.studentId === student?.id)
-    .forEach((journal) => {
-      historySessions.set(`${journal.scheduleId}-${journal.date}`, {
-        scheduleId: journal.scheduleId,
-        date: journal.date,
-      });
-    });
-
-  const rawRows: HistoryRow[] = Array.from(historySessions.values()).map((historySession) => {
-    const schedule = schedules.find((item) => item.id === historySession.scheduleId);
-    const subject = subjects.find((item) => item.id === schedule?.subjectId);
-    const journal = studentJournals.find(
-      (item) =>
-        item.studentId === student?.id &&
-        item.scheduleId === historySession.scheduleId &&
-        item.date === historySession.date,
-    );
-    const material = learningMaterials.find(
-      (item) => item.scheduleId === historySession.scheduleId && item.date === historySession.date,
-    );
-    const eligibility = getJournalEligibility({
-      studentId: student?.id ?? '',
-      scheduleId: historySession.scheduleId,
-      sessionDate: historySession.date,
-      journals: studentJournals,
-      assessments,
-      questionnaires,
-      currentDate: academicDateReference,
-    });
-
-    return {
-      id: `${historySession.scheduleId}-${historySession.date}`,
-      date: historySession.date,
-      subject: subject?.name ?? '-',
-      material: journal?.materialStudied ?? material?.title ?? '-',
-      entryStatus: (journal ? 'Selesai' : eligibility.locked ? 'Terkunci' : 'Belum Diisi') as HistoryRow['entryStatus'],
-      reviewStatus: journal?.reviewStatus ?? '-',
-      notes: journal?.notes ?? (eligibility.locked ? 'Lewat batas H+1.' : 'Menunggu pengisian jurnal.'),
-    };
-  });
+  const rawRows: HistoryRow[] = historySessions.map((learningSession) => ({
+    id: learningSession.key,
+    date: learningSession.sessionDate,
+    subject: learningSession.subject?.name ?? '-',
+    material: learningSession.journal?.materialStudied ?? learningSession.material?.title ?? '-',
+    entryStatus: (
+      learningSession.journal ? 'Selesai' : learningSession.eligibility.locked ? 'Terkunci' : 'Belum Diisi'
+    ) as HistoryRow['entryStatus'],
+    reviewStatus: learningSession.journal?.reviewStatus ?? '-',
+    notes: learningSession.journal?.notes ?? learningSession.eligibility.message,
+    startTime: learningSession.schedule.startTime,
+  }));
 
   const rows = rawRows
     .filter((item) => (subjectFilter === 'all' ? true : item.subject === subjectFilter))
     .filter((item) => (monthFilter === 'all' ? true : getMonthKey(item.date) === monthFilter))
-    .sort((first, second) => second.date.localeCompare(first.date));
+    .sort((first, second) => second.date.localeCompare(first.date) || first.startTime.localeCompare(second.startTime));
 
   const columns: TableColumn<HistoryRow>[] = [
     { key: 'date', header: 'Tanggal', render: (item) => formatDateID(item.date) },

@@ -71,14 +71,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
         })}
       </nav>
 
-      <div className="rounded-3xl border border-brand-100 bg-gradient-to-br from-brand-50 to-white p-4">
-        <p className="text-sm font-semibold text-slate-900">Hak akses role ini</p>
-        <div className="mt-2 space-y-2 text-sm leading-6 text-slate-600">
-          {accessHighlights.slice(1).map((item) => (
-            <p key={item}>{item}</p>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

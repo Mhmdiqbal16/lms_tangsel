@@ -206,6 +206,7 @@ entity "assessment_student_statuses" as assessment_student_statuses {
   --
   * completed : boolean
   completed_at : timestamptz
+  * score : integer
 }
 
 entity "assessment_student_answers" as assessment_student_answers {

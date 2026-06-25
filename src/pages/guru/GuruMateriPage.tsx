@@ -7,6 +7,7 @@ import { academicDateReference } from '@/data/mockData';
 import { useAppData } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
 import { GuruAssessmentSection } from '@/pages/guru/GuruTestPage';
+import { useActionNotifier } from '@/useActionNotifier';
 import { formatDateID, formatDayName } from '@/utils/date';
 
 interface MaterialRow {
@@ -31,6 +32,7 @@ export function GuruMateriPage() {
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'success' | 'warning'; text: string } | null>(null);
+  useActionNotifier(message);
 
   if (!teacher) {
     return null;
