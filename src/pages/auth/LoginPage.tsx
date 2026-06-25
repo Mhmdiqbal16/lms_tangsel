@@ -204,7 +204,7 @@ export function LoginPage() {
                 </button>
               </div>
               <p className="text-xs leading-5 text-slate-500">
-                Tidak bisa login atau lupa password? Silakan menghubungi pihak operator sekolah.
+                Siswa, guru, atau kurikulum yang tidak bisa login/lupa password silakan menghubungi operator sekolah.
               </p>
             </div>
 

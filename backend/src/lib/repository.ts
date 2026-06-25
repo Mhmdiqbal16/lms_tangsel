@@ -225,6 +225,12 @@ export type CreateAccountInput = {
   subjectIds?: string[];
 };
 
+export type UpdateAccountCredentialsInput = {
+  id: string;
+  identifier: string;
+  password?: string;
+};
+
 export type SaveClassInput = {
   id?: string;
   name: string;
@@ -1003,6 +1009,114 @@ export async function createAccount(input: CreateAccountInput) {
   }
 
   return toUser(userData as AppUserRow);
+}
+
+export async function updateAccountCredentials(input: UpdateAccountCredentialsInput) {
+  const accountId = input.id.trim();
+  const identifier = input.identifier.trim();
+  const password = input.password?.trim() ?? '';
+
+  if (!accountId || !identifier) {
+    throw new RepositoryError('ID akun dan username wajib diisi.', 422);
+  }
+
+  if (password && password.length < 6) {
+    throw new RepositoryError('Password baru minimal 6 karakter.', 422);
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase) {
+    const account = mockUsers.find((user) => user.id === accountId);
+
+    if (!account) {
+      throw new RepositoryError('Akun tidak ditemukan.', 404);
+    }
+
+    if (account.role === 'admin') {
+      throw new RepositoryError('Akun admin tidak dapat diedit dari menu operator.', 403);
+    }
+
+    const duplicate = mockUsers.some(
+      (user) =>
+        user.id !== accountId &&
+        user.role === account.role &&
+        decodeRoleScopedIdentifier(user.role, user.identifier) === identifier,
+    );
+
+    if (duplicate) {
+      throw new RepositoryError('Username sudah digunakan akun lain pada role yang sama.', 409);
+    }
+
+    account.identifier = identifier;
+    if (password) {
+      account.password = password;
+    }
+
+    return account;
+  }
+
+  const { data: accountData, error: accountError } = await supabase
+    .from('app_users')
+    .select('*')
+    .eq('id', accountId)
+    .maybeSingle();
+
+  throwSupabaseError('Gagal mengambil akun', accountError);
+
+  if (!accountData) {
+    throw new RepositoryError('Akun tidak ditemukan.', 404);
+  }
+
+  const account = toUser(accountData as AppUserRow);
+
+  if (account.role === 'admin') {
+    throw new RepositoryError('Akun admin tidak dapat diedit dari menu operator.', 403);
+  }
+
+  const { data: sameRoleUsers, error: sameRoleError } = await supabase
+    .from('app_users')
+    .select('id')
+    .eq('role', account.role)
+    .in('identifier', [identifier, encodeRoleScopedIdentifier(account.role, identifier)])
+    .neq('id', accountId)
+    .limit(1);
+
+  throwSupabaseError('Gagal memeriksa username akun', sameRoleError);
+
+  if ((sameRoleUsers ?? []).length > 0) {
+    throw new RepositoryError('Username sudah digunakan akun lain pada role yang sama.', 409);
+  }
+
+  const { data: existingIdentifierUsers, error: existingIdentifierError } = await supabase
+    .from('app_users')
+    .select('id')
+    .eq('identifier', identifier)
+    .neq('id', accountId)
+    .limit(1);
+
+  throwSupabaseError('Gagal memeriksa identitas akun', existingIdentifierError);
+
+  const storedIdentifier = (existingIdentifierUsers ?? []).length > 0
+    ? encodeRoleScopedIdentifier(account.role, identifier)
+    : identifier;
+  const updates: Partial<AppUserRow> = {
+    identifier: storedIdentifier,
+  };
+
+  if (password) {
+    updates.password_hash = hashPassword(password);
+  }
+
+  const { data: updatedAccount, error: updateError } = await supabase
+    .from('app_users')
+    .update(updates)
+    .eq('id', accountId)
+    .select()
+    .single();
+
+  throwSupabaseError('Gagal memperbarui akun', updateError);
+  return toUser(updatedAccount as AppUserRow);
 }
 
 export async function deleteAccount(accountId: string, currentUserId: string) {

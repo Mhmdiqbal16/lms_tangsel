@@ -16,6 +16,13 @@ type AdminTab = 'accounts' | 'teachers' | 'classes' | 'subjects' | 'schedules';
 type MasterDataKind = 'teacher' | 'class' | 'subject' | 'schedule';
 type AccountRecord = Omit<User, 'password'>;
 type AccountRoleFilter = Role | 'all';
+type AccountEditForm = {
+  id: string;
+  role: Role;
+  name: string;
+  identifier: string;
+  password: string;
+};
 type DeleteConfirmation =
   | { type: 'account'; account: AccountRecord }
   | { type: 'master-data'; kind: MasterDataKind; id: string; label: string; name: string };
@@ -100,6 +107,7 @@ export function AdminMasterDataPage() {
   const [subjectForm, setSubjectForm] = useState(emptySubjectForm);
   const [scheduleForm, setScheduleForm] = useState(emptyScheduleForm);
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
+  const [accountEditForm, setAccountEditForm] = useState<AccountEditForm | null>(null);
   const [accountSearch, setAccountSearch] = useState('');
   const [accountRoleFilter, setAccountRoleFilter] = useState<AccountRoleFilter>('all');
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -114,6 +122,7 @@ export function AdminMasterDataPage() {
   const [databaseSchedules, setDatabaseSchedules] = useState<Schedule[]>([]);
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
   const [isAccountSubmitting, setIsAccountSubmitting] = useState(false);
+  const [isAccountEditSubmitting, setIsAccountEditSubmitting] = useState(false);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [deletingMasterDataKey, setDeletingMasterDataKey] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
@@ -418,6 +427,66 @@ export function AdminMasterDataPage() {
     }
   };
 
+  const handleAccountEdit = (account: AccountRecord) => {
+    if (account.role === 'admin') {
+      setMessage({ tone: 'warning', text: 'Akun admin tidak dapat diedit dari menu operator.' });
+      return;
+    }
+
+    setAccountEditForm({
+      id: account.id,
+      role: account.role,
+      name: account.name,
+      identifier: account.identifier,
+      password: '',
+    });
+  };
+
+  const handleAccountEditSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!accountEditForm) {
+      return;
+    }
+
+    const identifier = accountEditForm.identifier.trim();
+    const password = accountEditForm.password.trim();
+
+    if (!identifier) {
+      setMessage({ tone: 'warning', text: 'Username wajib diisi.' });
+      return;
+    }
+
+    if (password && password.length < 6) {
+      setMessage({ tone: 'warning', text: 'Password baru minimal 6 karakter.' });
+      return;
+    }
+
+    setIsAccountEditSubmitting(true);
+
+    try {
+      const account = await apiRequest<AccountRecord>('/api/admin/accounts', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          id: accountEditForm.id,
+          identifier,
+          password: password || undefined,
+        }),
+      });
+
+      setAccounts((current) => upsertRecord(current, account));
+      setAccountEditForm(null);
+      setMessage({ tone: 'success', text: 'Username atau password akun berhasil diperbarui.' });
+    } catch (error) {
+      setMessage({
+        tone: 'warning',
+        text: error instanceof Error ? error.message : 'Akun gagal diperbarui.',
+      });
+    } finally {
+      setIsAccountEditSubmitting(false);
+    }
+  };
+
   const handleDeleteAccount = async (account: AccountRecord) => {
     if (account.id === session?.userId) {
       setMessage({ tone: 'warning', text: 'Akun admin yang sedang digunakan tidak bisa dihapus.' });
@@ -610,18 +679,30 @@ export function AdminMasterDataPage() {
     {
       key: 'actions',
       header: 'Aksi',
+      className: 'min-w-[150px] whitespace-nowrap',
       render: (item) =>
         item.id === session?.userId ? (
           <Badge variant="yellow">Akun aktif</Badge>
         ) : (
-          <button
-            type="button"
-            disabled={deletingAccountId === item.id}
-            onClick={() => handleDeleteAccount(item)}
-            className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
-          >
-            {deletingAccountId === item.id ? 'Menghapus...' : 'Hapus'}
-          </button>
+          <div className="flex flex-nowrap gap-2">
+            {item.role !== 'admin' ? (
+              <button
+                type="button"
+                onClick={() => handleAccountEdit(item)}
+                className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Edit
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={deletingAccountId === item.id}
+              onClick={() => handleDeleteAccount(item)}
+              className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+            >
+              {deletingAccountId === item.id ? 'Menghapus...' : 'Hapus'}
+            </button>
+          </div>
         ),
     },
   ];
@@ -956,6 +1037,67 @@ export function AdminMasterDataPage() {
               </button>
             </div>
           </form>
+          {accountEditForm ? (
+            <form
+              className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft"
+              onSubmit={handleAccountEditSubmit}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Edit Login Akun</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {accountEditForm.name} - {getRoleLabel(accountEditForm.role)}
+                  </p>
+                </div>
+                <Badge variant="yellow">Operator</Badge>
+              </div>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Username / NISN / NIP</span>
+                  <input
+                    value={accountEditForm.identifier}
+                    onChange={(event) =>
+                      setAccountEditForm((current) =>
+                        current ? { ...current, identifier: event.target.value } : current,
+                      )
+                    }
+                    className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                    placeholder="Username baru"
+                  />
+                </label>
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Password Baru</span>
+                  <input
+                    type="password"
+                    value={accountEditForm.password}
+                    onChange={(event) =>
+                      setAccountEditForm((current) =>
+                        current ? { ...current, password: event.target.value } : current,
+                      )
+                    }
+                    className="w-full rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 outline-none"
+                    placeholder="Kosongkan jika tidak diganti"
+                  />
+                </label>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={isAccountEditSubmitting}
+                  className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+                >
+                  {isAccountEditSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountEditForm(null)}
+                  className="rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          ) : null}
           {isAccountsLoading ? (
             <InfoAlert tone="info" message="Daftar akun sedang dimuat dari database." />
           ) : (
