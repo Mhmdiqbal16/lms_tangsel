@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FilterBar } from '@/components/ui/FilterBar';
@@ -108,6 +108,7 @@ export function AdminMasterDataPage() {
   const [scheduleForm, setScheduleForm] = useState(emptyScheduleForm);
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
   const [accountEditForm, setAccountEditForm] = useState<AccountEditForm | null>(null);
+  const accountEditFormRef = useRef<HTMLFormElement | null>(null);
   const [accountSearch, setAccountSearch] = useState('');
   const [accountRoleFilter, setAccountRoleFilter] = useState<AccountRoleFilter>('all');
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -175,6 +176,14 @@ export function AdminMasterDataPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!accountEditForm) {
+      return;
+    }
+
+    accountEditFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [accountEditForm?.id]);
 
   const tabs: Array<{ id: AdminTab; label: string; count: number }> = [
     { id: 'accounts', label: 'Akun', count: accounts.length },
@@ -691,7 +700,7 @@ export function AdminMasterDataPage() {
                 onClick={() => handleAccountEdit(item)}
                 className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
               >
-                Edit
+                Edit Login
               </button>
             ) : null}
             <button
@@ -1039,6 +1048,7 @@ export function AdminMasterDataPage() {
           </form>
           {accountEditForm ? (
             <form
+              ref={accountEditFormRef}
               className="rounded-3xl border border-brand-100 bg-white p-6 shadow-soft"
               onSubmit={handleAccountEditSubmit}
             >
