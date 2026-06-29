@@ -10,7 +10,7 @@ export function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dashboard Admin"
+        title="Dashboard Super Admin"
         description="Ringkasan statistik sistem monitoring pembelajaran sekolah secara keseluruhan."
         actions={
           <Link

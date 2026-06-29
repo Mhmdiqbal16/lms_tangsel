@@ -60,7 +60,7 @@ export const users: User[] = [
     role: 'admin',
     identifier: '197912102009011001',
     password: 'admin2026',
-    name: 'Admin Sekolah',
+    name: 'Super Admin Sekolah',
     referenceId: 'adm-1',
   },
 ];
@@ -164,7 +164,7 @@ export const admins: AdminProfile[] = [
   {
     id: 'adm-1',
     userId: 'user-admin-1',
-    name: 'Admin Sekolah',
+    name: 'Super Admin Sekolah',
     nip: '197912102009011001',
     email: 'admin@smkn2.sch.id',
   },
@@ -880,7 +880,7 @@ const reportSummary = {
 };
 
 export const demoAccounts = [
-  { role: 'admin' as const, identifier: '000000000000000000', password: 'admin12345', label: 'Admin Setup' },
+  { role: 'admin' as const, identifier: '000000000000000000', password: 'admin12345', label: 'Super Admin Setup' },
 ];
 
 export const mockData: MockData = {

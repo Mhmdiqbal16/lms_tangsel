@@ -989,7 +989,7 @@ export async function createAccount(input: CreateAccountInput) {
         nip: identifier,
         email,
       });
-      throwSupabaseError('Gagal membuat profil admin', error);
+      throwSupabaseError('Gagal membuat profil Super Admin', error);
     }
   } catch (error) {
     await supabase.from('app_users').delete().eq('id', userId);
@@ -1034,7 +1034,7 @@ export async function updateAccountCredentials(input: UpdateAccountCredentialsIn
     }
 
     if (account.role === 'admin') {
-      throw new RepositoryError('Akun admin tidak dapat diedit dari menu operator.', 403);
+      throw new RepositoryError('Akun Super Admin tidak dapat diedit dari menu operator.', 403);
     }
 
     const duplicate = mockUsers.some(
@@ -1071,7 +1071,7 @@ export async function updateAccountCredentials(input: UpdateAccountCredentialsIn
   const account = toUser(accountData as AppUserRow);
 
   if (account.role === 'admin') {
-    throw new RepositoryError('Akun admin tidak dapat diedit dari menu operator.', 403);
+    throw new RepositoryError('Akun Super Admin tidak dapat diedit dari menu operator.', 403);
   }
 
   const { data: sameRoleUsers, error: sameRoleError } = await supabase
@@ -1217,7 +1217,7 @@ export async function getUserProfile(user: User) {
   }
 
   const { data, error } = await supabase.from('admins').select('*').eq('id', user.referenceId).maybeSingle();
-  throwSupabaseError('Gagal mengambil profil admin', error);
+  throwSupabaseError('Gagal mengambil profil Super Admin', error);
   return data ? toAdmin(data as AdminRow) : null;
 }
 

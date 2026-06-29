@@ -19,7 +19,7 @@ export function SiswaAkunPage() {
 
       <InfoAlert
         tone="info"
-        message="Data profil dan password akun siswa hanya dapat diubah oleh admin melalui menu Data Master."
+        message="Data profil dan password akun siswa hanya dapat diubah oleh Super Admin melalui menu Data Master."
       />
 
       <section className="min-w-0 rounded-3xl border border-brand-100 bg-white p-6 shadow-soft">
@@ -65,7 +65,7 @@ export function SiswaAkunPage() {
             <div className="min-w-0 rounded-2xl bg-brand-50/60 p-4 md:col-span-2">
               <p className="text-sm font-medium text-slate-500">Keterangan</p>
               <p className="mt-2 break-words text-lg font-semibold text-slate-900 [overflow-wrap:anywhere]">
-                Hubungi admin jika ada perubahan nama, email, kelas, NISN, inisial, atau password.
+                Hubungi Super Admin jika ada perubahan nama, email, kelas, NISN, inisial, atau password.
               </p>
             </div>
           </div>

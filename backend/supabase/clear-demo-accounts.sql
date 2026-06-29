@@ -1,6 +1,6 @@
 -- Gunakan setelah schema.sql dan seed.sql berhasil.
--- File ini menghapus akun demo dari app_users, lalu menyisakan satu akun admin setup.
--- Profil siswa/guru/kurikulum/admin demo tetap ada sebagai data master, tetapi tidak bisa login sampai dibuatkan akun baru dari menu Admin.
+-- File ini menghapus akun demo dari app_users, lalu menyisakan satu akun Super Admin setup.
+-- Profil siswa/guru/kurikulum/Super Admin demo tetap ada sebagai data master, tetapi tidak bisa login sampai dibuatkan akun baru dari menu Super Admin.
 
 create extension if not exists "pgcrypto";
 
@@ -10,7 +10,7 @@ values (
   'admin',
   '000000000000000000',
   encode(digest('admin12345', 'sha256'), 'hex'),
-  'Admin Setup',
+  'Super Admin Setup',
   'adm-bootstrap'
 )
 on conflict (id) do update set
@@ -25,7 +25,7 @@ insert into admins (id, user_id, name, nip, email)
 values (
   'adm-bootstrap',
   'user-admin-bootstrap',
-  'Admin Setup',
+  'Super Admin Setup',
   '000000000000000000',
   'admin.setup@smkn2.local'
 )

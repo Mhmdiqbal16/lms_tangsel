@@ -9,7 +9,7 @@ export function getRoleLabel(role: Role) {
     siswa: 'Siswa',
     guru: 'Guru',
     kurikulum: 'Kurikulum',
-    admin: 'Admin',
+    admin: 'Super Admin',
   }[role];
 }
 
@@ -25,4 +25,3 @@ export function getInitials(name: string) {
 export function createId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
-

@@ -1,6 +1,6 @@
--- Mengosongkan data demo/operasional agar admin bisa isi manual dari awal.
--- Aman untuk tahap setup/dev: akun role admin tetap dipertahankan.
--- Jalankan di Supabase SQL Editor setelah memastikan minimal ada satu akun admin yang bisa login.
+-- Mengosongkan data demo/operasional agar Super Admin bisa isi manual dari awal.
+-- Aman untuk tahap setup/dev: akun role admin (Super Admin) tetap dipertahankan.
+-- Jalankan di Supabase SQL Editor setelah memastikan minimal ada satu akun Super Admin yang bisa login.
 
 begin;
 

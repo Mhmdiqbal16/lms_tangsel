@@ -79,27 +79,27 @@ for (const [table, column] of deleteSteps) {
 
 const { error: userDeleteError } = await supabase.from('app_users').delete().neq('role', 'admin');
 if (userDeleteError) {
-  throw new Error(`Gagal menghapus akun non-admin: ${userDeleteError.message}`);
+  throw new Error(`Gagal menghapus akun non-Super Admin: ${userDeleteError.message}`);
 }
 
 const { data: adminUsers, error: adminUserError } = await supabase.from('app_users').select('id').eq('role', 'admin');
 if (adminUserError) {
-  throw new Error(`Gagal mengambil akun admin: ${adminUserError.message}`);
+  throw new Error(`Gagal mengambil akun Super Admin: ${adminUserError.message}`);
 }
 
 const adminUserIds = new Set((adminUsers ?? []).map((item) => item.id));
 const { data: adminProfiles, error: adminProfileError } = await supabase.from('admins').select('id,user_id');
 if (adminProfileError) {
-  throw new Error(`Gagal mengambil profil admin: ${adminProfileError.message}`);
+  throw new Error(`Gagal mengambil profil Super Admin: ${adminProfileError.message}`);
 }
 
 for (const profile of adminProfiles ?? []) {
   if (!profile.user_id || !adminUserIds.has(profile.user_id)) {
     const { error } = await supabase.from('admins').delete().eq('id', profile.id);
     if (error) {
-      throw new Error(`Gagal menghapus profil admin ${profile.id}: ${error.message}`);
+      throw new Error(`Gagal menghapus profil Super Admin ${profile.id}: ${error.message}`);
     }
   }
 }
 
-console.log('Data manual berhasil dikosongkan. Akun admin tetap dipertahankan.');
+console.log('Data manual berhasil dikosongkan. Akun Super Admin tetap dipertahankan.');

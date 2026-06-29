@@ -13,7 +13,7 @@ insert into app_users (id, role, identifier, password_hash, name, reference_id) 
   ('user-siswa-1', 'siswa', '0067458123', encode(digest('alya2026', 'sha256'), 'hex'), 'Alya Putri Ramadhani', 'std-1'),
   ('user-guru-1', 'guru', '198906122018011001', encode(digest('budi2026', 'sha256'), 'hex'), 'Budi Santoso, S.Kom.', 't-1'),
   ('user-kurikulum-1', 'kurikulum', '197905182010012003', encode(digest('rina2026', 'sha256'), 'hex'), 'Rina Wulandari, M.Pd.', 'kur-1'),
-  ('user-admin-1', 'admin', '197912102009011001', encode(digest('admin2026', 'sha256'), 'hex'), 'Admin Sekolah', 'adm-1')
+  ('user-admin-1', 'admin', '197912102009011001', encode(digest('admin2026', 'sha256'), 'hex'), 'Super Admin Sekolah', 'adm-1')
 on conflict (id) do update set
   role = excluded.role,
   identifier = excluded.identifier,
@@ -78,7 +78,7 @@ on conflict (id) do update set
   updated_at = now();
 
 insert into admins (id, user_id, name, nip, email) values
-  ('adm-1', 'user-admin-1', 'Admin Sekolah', '197912102009011001', 'admin@smkn2.sch.id')
+  ('adm-1', 'user-admin-1', 'Super Admin Sekolah', '197912102009011001', 'admin@smkn2.sch.id')
 on conflict (id) do update set
   user_id = excluded.user_id,
   name = excluded.name,

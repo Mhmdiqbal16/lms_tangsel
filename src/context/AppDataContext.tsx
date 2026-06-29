@@ -847,7 +847,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
       return {
         success: false,
-        message: 'Password hanya dapat diubah oleh admin melalui menu Data Master.',
+        message: 'Password hanya dapat diubah oleh Super Admin melalui menu Data Master.',
       };
     },
     updateStudentAccount: (payload) => {
@@ -855,7 +855,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
       return {
         success: false,
-        message: 'Profil siswa hanya dapat diubah oleh admin melalui menu Data Master.',
+        message: 'Profil siswa hanya dapat diubah oleh Super Admin melalui menu Data Master.',
       };
     },
     updateTeacherProfile: (payload) => {
@@ -863,7 +863,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
       return {
         success: false,
-        message: 'Profil guru hanya dapat diubah oleh admin melalui menu Data Master.',
+        message: 'Profil guru hanya dapat diubah oleh Super Admin melalui menu Data Master.',
       };
     },
     saveStudentByAdmin: (payload) => {

@@ -24,17 +24,17 @@ Akun demo dari seed:
 - Siswa: `0067458123` / `alya2026`
 - Guru: `198906122018011001` / `budi2026`
 - Kurikulum: `197905182010012003` / `rina2026`
-- Admin: `197912102009011001` / `admin2026`
+- Super Admin: `197912102009011001` / `admin2026`
 
 ## 2b. Opsional: hapus akun demo
 
-Kalau ingin akun demo tidak dipakai dan semua akun dibuat dari menu Admin, jalankan `clear-demo-accounts.sql` setelah `seed.sql`.
+Kalau ingin akun demo tidak dipakai dan semua akun dibuat dari menu Super Admin, jalankan `clear-demo-accounts.sql` setelah `seed.sql`.
 
-File itu akan menghapus akun demo dari `app_users`, lalu membuat akun admin sementara:
+File itu akan menghapus akun demo dari `app_users`, lalu membuat akun Super Admin sementara:
 
-- Admin setup: `000000000000000000` / `admin12345`
+- Super Admin setup: `000000000000000000` / `admin12345`
 
-Login dengan akun admin setup tersebut, lalu buat akun role siswa/guru/kurikulum/admin dari aplikasi.
+Login dengan akun Super Admin setup tersebut, lalu buat akun role siswa/guru/kurikulum/admin dari aplikasi.
 
 ## 3. Isi environment backend
 

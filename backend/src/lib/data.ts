@@ -83,7 +83,7 @@ export const users: User[] = [
     role: 'admin',
     identifier: '197912102009011001',
     password: 'admin2026',
-    name: 'Admin Sekolah',
+    name: 'Super Admin Sekolah',
     referenceId: 'adm-1',
   },
 ];
@@ -187,7 +187,7 @@ export const admins: Admin[] = [
   {
     id: 'adm-1',
     userId: 'user-admin-1',
-    name: 'Admin Sekolah',
+    name: 'Super Admin Sekolah',
     nip: '197912102009011001',
     email: 'admin@smkn2.sch.id',
   },

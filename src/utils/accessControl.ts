@@ -38,7 +38,7 @@ const accessHighlightsByRole: Record<Role, string[]> = {
   siswa: ['Melihat dashboard, jadwal, dan absensi pribadi.'],
   guru: ['Mengisi presensi mengajar sesuai jadwal dan akun guru yang aktif.'],
   kurikulum: ['Memantau dashboard monitoring, kehadiran guru, jurnal siswa, dan hasil kuisioner lintas kelas.'],
-  admin: ['Melihat dashboard administrasi sistem yang aktif.'],
+  admin: ['Melihat dashboard Super Admin dan mengelola data master sistem.'],
 };
 
 export function hasPermissionForRole(role: Role, permission: Permission) {

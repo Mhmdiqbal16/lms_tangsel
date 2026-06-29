@@ -161,7 +161,7 @@ export function AdminMasterDataPage() {
         if (isMounted) {
           setMessage({
             tone: 'warning',
-            text: error instanceof Error ? error.message : 'Data admin gagal dimuat dari database.',
+            text: error instanceof Error ? error.message : 'Data Super Admin gagal dimuat dari database.',
           });
         }
       })
@@ -438,7 +438,7 @@ export function AdminMasterDataPage() {
 
   const handleAccountEdit = (account: AccountRecord) => {
     if (account.role === 'admin') {
-      setMessage({ tone: 'warning', text: 'Akun admin tidak dapat diedit dari menu operator.' });
+      setMessage({ tone: 'warning', text: 'Akun Super Admin tidak dapat diedit dari menu operator.' });
       return;
     }
 
@@ -498,7 +498,7 @@ export function AdminMasterDataPage() {
 
   const handleDeleteAccount = async (account: AccountRecord) => {
     if (account.id === session?.userId) {
-      setMessage({ tone: 'warning', text: 'Akun admin yang sedang digunakan tidak bisa dihapus.' });
+      setMessage({ tone: 'warning', text: 'Akun Super Admin yang sedang digunakan tidak bisa dihapus.' });
       return;
     }
 
@@ -885,7 +885,7 @@ export function AdminMasterDataPage() {
     <div className="space-y-6">
       <PageHeader
         title="Data Master"
-        description="Admin mengelola akun pengguna, guru, kelas, mata pelajaran, dan jadwal yang menjadi dasar seluruh fitur monitoring."
+        description="Super Admin mengelola akun pengguna, guru, kelas, mata pelajaran, dan jadwal yang menjadi dasar seluruh fitur monitoring."
       />
 
       {message ? <InfoAlert tone={message.tone} message={message.text} /> : null}
