@@ -3,7 +3,7 @@ import { academicDateReference } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/ToastContext';
 import { formatDateID } from '@/utils/date';
-import { getInitials, getRoleLabel } from '@/utils/helpers';
+import { getDisplayName, getInitials, getRoleLabel } from '@/utils/helpers';
 
 interface TopbarProps {
   onOpenSidebar: () => void;
@@ -16,6 +16,8 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
   if (!session) {
     return null;
   }
+
+  const displayName = getDisplayName(session.name, session.role);
 
   return (
     <header className="glass-panel sticky top-0 z-30 border-b border-brand-100 px-4 py-4 md:px-6">
@@ -30,7 +32,7 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
             <Menu className="h-5 w-5" />
           </button>
           <div>
-            <p className="text-sm font-semibold text-slate-900">Selamat datang, {session.name}</p>
+            <p className="text-sm font-semibold text-slate-900">Selamat datang, {displayName}</p>
             <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
               <CalendarDays className="h-4 w-4 text-brand-500" />
               <span>Hari aktif sekolah: {formatDateID(academicDateReference)}</span>
@@ -41,10 +43,10 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-3 rounded-2xl border border-brand-100 bg-white px-4 py-3 shadow-sm">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 text-sm font-bold text-white">
-              {getInitials(session.name)}
+              {getInitials(displayName)}
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">{session.name}</p>
+              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
               <p className="text-xs uppercase tracking-[0.16em] text-brand-500">{getRoleLabel(session.role)}</p>
             </div>
           </div>

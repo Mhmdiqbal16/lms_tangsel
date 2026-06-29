@@ -13,6 +13,14 @@ export function getRoleLabel(role: Role) {
   }[role];
 }
 
+export function getDisplayName(name: string, role?: Role) {
+  if (role !== 'admin') {
+    return name;
+  }
+
+  return name.replace(/\s*\((admin|super\s*admin)\)\s*$/i, ` (${getRoleLabel(role)})`);
+}
+
 export function getInitials(name: string) {
   return name
     .split(' ')
